@@ -1,40 +1,40 @@
 {
-  "name": "01 — Daily Scrape & Match",
+  "name": "01 — Daily Match & Scrape",
   "nodes": [
     {
       "id": "cron-trigger",
-      "name": "Daily Cron 8AM IST",
+      "name": "Daily Cron (after quota reset)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1,
       "position": [200, 300],
       "parameters": {
         "rule": {
-          "interval": [{ "field": "cronExpression", "expression": "30 2 * * *" }]
+          "interval": [{ "field": "cronExpression", "expression": "0 8 * * *" }]
         }
       }
     },
     {
-      "id": "run-scraper",
-      "name": "Run Scraper",
+      "id": "run-matcher",
+      "name": "Match Backlog (oldest first)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [450, 300],
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:3002/run/scraper",
-        "options": { "timeout": 300000 }
+        "url": "http://host.docker.internal:3002/run/matcher",
+        "options": { "timeout": 1800000 }
       }
     },
     {
-      "id": "run-matcher",
-      "name": "Run Matcher",
+      "id": "run-daily-scrape",
+      "name": "Top-up Scrape (list + Apify)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [700, 300],
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:3002/run/matcher",
-        "options": { "timeout": 300000 }
+        "url": "http://host.docker.internal:3002/run/daily-scrape",
+        "options": { "timeout": 600000 }
       }
     },
     {
@@ -50,7 +50,7 @@
         "bodyParameters": {
           "parameters": [
             { "name": "chat_id", "value": "={{$env.TELEGRAM_CHAT_ID}}" },
-            { "name": "text", "value": "=📊 *Daily Job Agent Run Complete*\n\nScraper + Matcher finished. Check your dashboard for new matches." },
+            { "name": "text", "value": "=📊 *Daily Job Agent Run Complete*\n\nBacklog matched + fresh jobs scraped. Check your dashboard for new matches to approve." },
             { "name": "parse_mode", "value": "Markdown" }
           ]
         }
@@ -58,9 +58,9 @@
     }
   ],
   "connections": {
-    "Daily Cron 8AM IST": { "main": [[{ "node": "Run Scraper", "type": "main", "index": 0 }]] },
-    "Run Scraper": { "main": [[{ "node": "Run Matcher", "type": "main", "index": 0 }]] },
-    "Run Matcher": { "main": [[{ "node": "Telegram Summary", "type": "main", "index": 0 }]] }
+    "Daily Cron (after quota reset)": { "main": [[{ "node": "Match Backlog (oldest first)", "type": "main", "index": 0 }]] },
+    "Match Backlog (oldest first)": { "main": [[{ "node": "Top-up Scrape (list + Apify)", "type": "main", "index": 0 }]] },
+    "Top-up Scrape (list + Apify)": { "main": [[{ "node": "Telegram Summary", "type": "main", "index": 0 }]] }
   },
   "settings": { "executionOrder": "v1" }
 }

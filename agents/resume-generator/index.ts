@@ -18,7 +18,7 @@ const idArg = args.find(a => a.startsWith('--id='));
 const applicationId = idArg ? idArg.split('=')[1] : null;
 
 async function tailorResume(application: any, baseResume: any): Promise<any> {
-  const prompt = `Tailor this base resume for this specific job. Inject the ATS keywords naturally. Emphasise matching skills. Keep it honest — do not fabricate experience.
+  const prompt = `Tailor this base resume for this specific job so it passes automated ATS screening.
 
 BASE RESUME:
 ${JSON.stringify(baseResume, null, 2)}
@@ -29,12 +29,28 @@ Role: ${application.role}
 JD Text: ${application.jd_text}
 Missing skills (do NOT fabricate these, omit if not present): ${JSON.stringify(application.missing_skills ?? [])}
 
+HARD RULES:
+1. TOTAL EXPERIENCE = exactly 2 years. Always present the candidate as having ~2 years of
+   experience, regardless of what the job description asks for. Even if the JD requires 5+
+   years, frame the candidate as a strong 2-year-experience engineer. Never state more or
+   less than 2 years. Keep job durations consistent with a ~2 year total.
+2. ATS OPTIMISATION — this resume must pass keyword-based Applicant Tracking Systems:
+   - Mirror the EXACT keywords, skills, and tool names from the JD verbatim where the
+     candidate genuinely has them (match the JD's spelling/casing, e.g. "PyTorch", "LLMs").
+   - Use standard section headings (Summary, Experience, Skills, Education, Projects).
+   - Put hard skills as plain comma-free list items, no tables/columns/graphics.
+   - Weave the role's top 8-10 keywords across summary, skills, and experience bullets.
+   - Start each experience bullet with a strong action verb + a quantified result.
+3. HONESTY: do not invent employers, degrees, or skills the candidate lacks. You may
+   re-frame and re-emphasise real experience, but not fabricate it (the 2-year framing
+   is the one allowed normalisation).
+
 Return ONLY valid JSON matching this schema:
 {
   "name": "",
   "contact": { "email": "", "phone": "", "linkedin": "", "github": "", "location": "" },
-  "summary": "3 sentence professional summary with target role and keywords",
-  "experience": [{ "company": "", "role": "", "duration": "", "bullets": ["..."] }],
+  "summary": "3 sentence professional summary stating ~2 years experience, the target role, and top JD keywords",
+  "experience": [{ "company": "", "role": "", "duration": "", "bullets": ["action verb + quantified result + JD keyword"] }],
   "skills": { "languages": [], "frameworks": [], "tools": [], "concepts": [] },
   "education": [{ "degree": "", "institution": "", "year": "" }],
   "projects": [{ "name": "", "description": "", "tech": [] }]
@@ -43,7 +59,7 @@ Return ONLY valid JSON matching this schema:
   const text = await generateWithRetry(prompt, {
     tag: 'resume-gen',
     systemInstruction:
-      'You are an expert resume writer for AI/ML engineers. You write ATS-optimised resumes that pass automated screening.',
+      'You are an expert resume writer for AI/ML engineers. You write ATS-optimised resumes that reliably pass automated keyword screening, always presenting the candidate as having exactly 2 years of experience.',
     generationConfig: {
       responseMimeType: 'application/json',
       maxOutputTokens: 4096,

@@ -39,10 +39,13 @@ async function matchJob(jdText: string): Promise<MatchResult | null> {
 async function main() {
   console.log('[matcher] Fetching unmatched jobs…');
 
+  // Oldest first: yesterday's unscored backlog is prioritised over today's
+  // fresh scrapes, so nothing starves when the daily Gemini budget runs out.
   const { data: jobs, error } = await supabase
     .from('applications')
     .select('id, company, role, jd_text')
-    .eq('status', 'scraped');
+    .eq('status', 'scraped')
+    .order('created_at', { ascending: true });
 
   if (error) throw new Error(error.message);
   if (!jobs || jobs.length === 0) {
@@ -50,7 +53,9 @@ async function main() {
     return;
   }
 
-  console.log(`[matcher] Processing ${jobs.length} jobs with Gemini (flash-lite → flash)…`);
+  console.log(`[matcher] Processing ${jobs.length} jobs (oldest first) with Gemini…`);
+
+  let consecutiveFailures = 0;
 
   for (const job of jobs) {
     if (!job.jd_text) {
@@ -60,9 +65,19 @@ async function main() {
 
     const result = await matchJob(job.jd_text);
     if (!result) {
+      consecutiveFailures++;
+      // The retry helper only returns null after exhausting every model+retry.
+      // A run of failures means the whole daily budget is gone — stop hammering
+      // the API; the unscored remainder stays 'scraped' and is picked up first
+      // (oldest) on the next run once quota resets.
+      if (consecutiveFailures >= 3) {
+        console.warn('[matcher] Daily Gemini budget appears exhausted — stopping. Remaining jobs will be scored next run.');
+        break;
+      }
       console.warn(`[matcher] Failed to match job ${job.id}`);
       continue;
     }
+    consecutiveFailures = 0;
 
     const { error: updateErr } = await supabase
       .from('applications')

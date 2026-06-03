@@ -1,9 +1,17 @@
 import { GoogleGenerativeAI, type GenerationConfig } from '@google/generative-ai';
 
-// flash-lite has the highest free-tier daily quota; flash is the fallback.
-// Each model name is a separate daily quota bucket, so falling through to the
-// next model buys more headroom once the first model's daily cap is hit.
-const MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+// Each model name (including the "-latest" aliases) is a SEPARATE free-tier
+// daily quota bucket — verified empirically: gemini-2.5-flash-lite can be
+// exhausted while gemini-flash-lite-latest still answers. Chaining them
+// multiplies the free daily scoring budget from ~20 to ~80-100/day with no
+// billing. Ordered cheapest/lightest first (fine for matching & classifying).
+const MODELS = [
+  'gemini-2.5-flash-lite',
+  'gemini-flash-lite-latest',
+  'gemini-2.0-flash-lite',
+  'gemini-2.5-flash',
+  'gemini-flash-latest',
+];
 const MAX_RETRIES = 4;
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));

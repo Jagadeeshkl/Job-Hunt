@@ -18,31 +18,37 @@
     {
       "id": "run-resume-gen",
       "name": "Generate Resume + Cover Letter",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
       "position": [450, 300],
       "parameters": {
-        "command": "=cd /home/ubuntu/job-agent && npx ts-node agents/resume-generator/index.ts --id={{$json.body.id}} 2>&1"
+        "method": "POST",
+        "url": "=http://host.docker.internal:3002/run/resume-generator?id={{$json.body.id}}",
+        "options": { "timeout": 300000 }
       }
     },
     {
       "id": "run-auto-apply",
       "name": "Auto Apply",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
       "position": [700, 300],
       "parameters": {
-        "command": "=cd /home/ubuntu/job-agent && npx ts-node agents/auto-apply/index.ts --id={{$('Webhook: Approve').item.json.body.id}} 2>&1"
+        "method": "POST",
+        "url": "=http://host.docker.internal:3002/run/auto-apply?id={{$('Webhook: Approve').item.json.body.id}}",
+        "options": { "timeout": 120000 }
       }
     },
     {
       "id": "run-notion-sync",
       "name": "Sync to Notion",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
       "position": [950, 300],
       "parameters": {
-        "command": "=cd /home/ubuntu/job-agent && npx ts-node agents/notion-sync/index.ts --id={{$('Webhook: Approve').item.json.body.id}} 2>&1"
+        "method": "POST",
+        "url": "=http://host.docker.internal:3002/run/notion-sync-id?id={{$('Webhook: Approve').item.json.body.id}}",
+        "options": { "timeout": 120000 }
       }
     },
     {
@@ -71,6 +77,5 @@
     "Auto Apply": { "main": [[{ "node": "Sync to Notion", "type": "main", "index": 0 }]] },
     "Sync to Notion": { "main": [[{ "node": "Telegram: Applied", "type": "main", "index": 0 }]] }
   },
-  "active": false,
   "settings": { "executionOrder": "v1" }
 }

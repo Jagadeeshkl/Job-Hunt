@@ -16,21 +16,25 @@
     {
       "id": "run-scraper",
       "name": "Run Scraper",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
       "position": [450, 300],
       "parameters": {
-        "command": "cd /home/ubuntu/job-agent && npx ts-node agents/scraper/index.ts 2>&1"
+        "method": "POST",
+        "url": "http://host.docker.internal:3002/run/scraper",
+        "options": { "timeout": 300000 }
       }
     },
     {
       "id": "run-matcher",
       "name": "Run Matcher",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
       "position": [700, 300],
       "parameters": {
-        "command": "cd /home/ubuntu/job-agent && npx ts-node agents/matcher/index.ts 2>&1"
+        "method": "POST",
+        "url": "http://host.docker.internal:3002/run/matcher",
+        "options": { "timeout": 300000 }
       }
     },
     {
@@ -58,6 +62,5 @@
     "Run Scraper": { "main": [[{ "node": "Run Matcher", "type": "main", "index": 0 }]] },
     "Run Matcher": { "main": [[{ "node": "Telegram Summary", "type": "main", "index": 0 }]] }
   },
-  "active": false,
   "settings": { "executionOrder": "v1" }
 }

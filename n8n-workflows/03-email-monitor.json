@@ -16,17 +16,18 @@
     {
       "id": "run-email-monitor",
       "name": "Run Email Monitor",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
       "position": [450, 300],
       "parameters": {
-        "command": "cd /home/ubuntu/job-agent && npx ts-node agents/email-monitor/index.ts 2>&1"
+        "method": "POST",
+        "url": "http://host.docker.internal:3002/run/email-monitor",
+        "options": { "timeout": 120000 }
       }
     }
   ],
   "connections": {
     "Every 15 Minutes": { "main": [[{ "node": "Run Email Monitor", "type": "main", "index": 0 }]] }
   },
-  "active": false,
   "settings": { "executionOrder": "v1" }
 }

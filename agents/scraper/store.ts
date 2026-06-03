@@ -58,12 +58,18 @@ export async function insertJobs(
     ats_type: j._ats, // DB enum accepts greenhouse | lever | ashby
     status: 'scraped',
   }));
-  const { error } = await supabase.from('applications').insert(rows);
+  // Ignore-duplicate upsert on jd_url: one already-seen URL (e.g. a race with a
+  // concurrent scrape) must not fail the whole batch. Existing rows are left
+  // untouched; only genuinely new jobs are inserted.
+  const { data, error } = await supabase
+    .from('applications')
+    .upsert(rows, { onConflict: 'jd_url', ignoreDuplicates: true })
+    .select('id');
   if (error) {
     console.error('[store] insert error:', error.message);
     return 0;
   }
-  return rows.length;
+  return data?.length ?? 0;
 }
 
 // Turn an ats_id slug into a readable company name: "jazzx-ai" -> "Jazzx Ai".

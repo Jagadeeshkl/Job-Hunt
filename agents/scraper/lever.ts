@@ -1,5 +1,5 @@
 import fetch from 'node-fetch';
-import type { JobListing } from './greenhouse';
+import { MIN_JD_TEXT_CHARS, type JobListing } from './greenhouse';
 
 const AI_KEYWORDS = [
   'AI', 'ML', 'Machine Learning', 'GenAI', 'LLM', 'NLP',
@@ -52,6 +52,7 @@ export async function fetchLeverJobs(
     const description = job.descriptionPlain ?? job.description ?? '';
     const lists = extractText(job.lists ?? []);
     const jdText = [description, lists].filter(Boolean).join('\n\n');
+    if (jdText.length < MIN_JD_TEXT_CHARS) continue; // skip thin/un-tailorable JDs
 
     results.push({
       company: companyName,

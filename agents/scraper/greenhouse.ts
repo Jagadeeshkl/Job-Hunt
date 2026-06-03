@@ -16,6 +16,11 @@ export interface JobListing {
   salary_range: string | null;
 }
 
+// Jobs whose JD text is shorter than this are un-tailorable (often just section
+// headers with no body) — skip them so they don't waste match quota or pollute
+// the approval queue. Shared by all three ATS fetchers.
+export const MIN_JD_TEXT_CHARS = 300;
+
 function stripHtml(html: string): string {
   return html
     .replace(/<[^>]+>/g, ' ')
@@ -60,6 +65,7 @@ export async function fetchGreenhouseJobs(
 
     const jdHtml = job.content ?? '';
     const jdText = stripHtml(jdHtml);
+    if (jdText.length < MIN_JD_TEXT_CHARS) continue; // skip thin/un-tailorable JDs
     const location =
       job.location?.name ?? job.offices?.[0]?.name ?? 'Unknown';
 

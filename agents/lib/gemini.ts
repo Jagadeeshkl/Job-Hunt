@@ -26,6 +26,17 @@ function retryDelayMs(err: any): number | null {
   return null;
 }
 
+// True when a 429 is the per-DAY quota being exhausted (vs a transient per-minute
+// rate limit). Google returns a short RetryInfo even for daily exhaustion, so
+// waiting is pointless — we should jump to the next model's separate daily bucket.
+function isDailyQuotaExhausted(err: any): boolean {
+  const qf = err?.errorDetails?.find((d: any) => d['@type']?.includes('QuotaFailure'));
+  const viols = qf?.violations ?? [];
+  if (viols.some((v: any) => /PerDay/i.test(v?.quotaId ?? ''))) return true;
+  // Fall back to the message text when structured details are absent.
+  return /per day|PerDay|free_tier.*limit/i.test(err?.message ?? '');
+}
+
 export interface GenerateOptions {
   systemInstruction?: string;
   generationConfig?: GenerationConfig;
@@ -70,13 +81,20 @@ export async function generateWithRetry(
           continue;
         }
         if (status === 429) {
+          // Daily bucket gone — waiting won't help (each model has its own daily
+          // quota), so jump straight to the next model.
+          if (isDailyQuotaExhausted(err)) {
+            console.warn(`[${tag}] ${modelName} daily quota exhausted, switching model…`);
+            break;
+          }
+          // Transient per-minute rate limit — honour Google's short retry delay.
           const delay = retryDelayMs(err);
           if (delay && delay <= 60000) {
             console.warn(`[${tag}] ${modelName} 429 (rate), waiting ${delay / 1000}s…`);
             await sleep(delay);
             continue;
           }
-          console.warn(`[${tag}] ${modelName} daily quota exhausted, switching model…`);
+          console.warn(`[${tag}] ${modelName} rate limited, switching model…`);
           break;
         }
         // Unknown error — don't hammer it.

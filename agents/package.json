@@ -1,0 +1,27 @@
+{
+  "name": "job-agent-agents",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "scrape": "ts-node scraper/index.ts",
+    "match": "ts-node matcher/index.ts",
+    "email": "ts-node email-monitor/index.ts",
+    "telegram-test": "ts-node telegram-bot/index.ts --test",
+    "gmail-auth": "ts-node email-monitor/gmail-auth.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
+    "form-data": "^4.0.0",
+    "node-fetch": "^2.7.0",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/node-fetch": "^2.6.11",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "name": "Jagadeesh K L",
+  "contact": {
+    "email": "kljagadeesh008@gmail.com",
+    "phone": "+91 7358269329",
+    "linkedin": "https://linkedin.com/in/k-l-jagadeesh",
+    "github": "https://github.com/k-l-jagadeesh",
+    "location": "Chennai, Tamil Nadu, India"
+  },
+  "summary": "Data-driven AI/ML professional with a B.Tech in Artificial Intelligence and Data Science and 1.3+ years of experience at Cognizant as a Workday Extend Consultant. Skilled in Python, TensorFlow, LLMs, NLP, and end-to-end ML pipelines. Proven track record building production ML systems (90% accuracy medical chatbot, 86% accuracy stock predictor) and enterprise-grade Workday applications. Seeking AI/ML engineering roles in Chennai or Bangalore.",
+  "experience": [
+    {
+      "company": "Cognizant Technology Solutions",
+      "role": "Workday Extend Consultant",
+      "duration": "Dec 2024 – Present",
+      "bullets": [
+        "Designed and deployed multiple custom enterprise applications on Workday Extend including UNUM Application, Employee Relations Manager, and Emergency Crisis Manager used by thousands of employees.",
+        "Built secure REST integrations and event-driven orchestration workflows connecting Workday Core HCM with custom Extend applications.",
+        "Implemented role-based security policies, business process configurations, and dynamic UI rendering based on user context.",
+        "Developed SLA tracking logic with dynamic date calculations and dashboard-based case analytics for Employee Relations Manager.",
+        "Certified in Workday Pro Integrations and Workday Integration Orchestration."
+      ]
+    },
+    {
+      "company": "Shiash Info Solutions Private Limited",
+      "role": "Data Science Intern",
+      "duration": "2023",
+      "bullets": [
+        "Solved real-world case-based ML projects using TensorFlow, NumPy, Pandas, and Power BI for data analytics.",
+        "Built and evaluated supervised (classification, regression) and unsupervised (clustering) models, achieving 40% improvement in predictive accuracy.",
+        "Developed Python pipelines for data preprocessing, feature engineering, and model evaluation."
+      ]
+    }
+  ],
+  "skills": {
+    "languages": ["Python", "SQL", "PMD Scripting"],
+    "frameworks": ["TensorFlow", "PyTorch", "LangChain", "ChainLit", "Pandas", "NumPy", "Matplotlib"],
+    "tools": ["Power BI", "Workday Extend", "Workday Orchestration", "Android Studio", "Git", "Jupyter"],
+    "concepts": ["Machine Learning", "LLMs", "NLP", "LSTM", "RAG", "Time Series Forecasting", "Data Analytics", "REST APIs", "Business Process Configuration", "Vector Databases"]
+  },
+  "education": [
+    {
+      "degree": "B.Tech Artificial Intelligence and Data Science",
+      "institution": "Panimalar Institute of Technology",
+      "year": "2024",
+      "grade": "CGPA 8.5"
+    }
+  ],
+  "projects": [
+    {
+      "name": "Med-Doc — Medical ChatBot",
+      "description": "Built an LLM-powered medical chatbot achieving 90% accuracy in delivering precise medical information. Used web scraping to compile a knowledge database from medical literature, ChainLit for the interface, and a vector database for contextually relevant NLP responses.",
+      "tech": ["Python", "LLM", "LangChain", "ChainLit", "NLP", "Vector Database", "Web Scraping"]
+    },
+    {
+      "name": "Stock Market Price Predictor",
+      "description": "Spearheaded a stock market prediction system forecasting daily closing prices with 86% accuracy. Implemented LSTM recurrent neural network on historical Yahoo Finance data including OHLCV metrics.",
+      "tech": ["Python", "TensorFlow", "LSTM", "Yahoo Finance API", "NumPy", "Pandas"]
+    },
+    {
+      "name": "LipNet + Morse Code Accessibility Tool",
+      "description": "Developed a communication aid for visually and audibly impaired users using LipNet (CNN-based lip reading) to convert lip movements to text, then translated to Morse Code vibration patterns via a custom Android app.",
+      "tech": ["LipNet", "CNN", "Android Studio", "Python", "TensorFlow"]
+    }
+  ],
+  "certifications": [
+    "Workday Pro Integrations (Certified)",
+    "Workday Integration Orchestration (Certified)",
+    "Specialization in Machine Learning — deeplearning.ai (Ongoing)",
+    "Mathematics for Machine Learning — deeplearning.ai (Ongoing)"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "name": "04 — Notion Sync (Manual Re-sync)",
+  "nodes": [
+    {
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {}
+    },
+    {
+      "id": "run-notion-sync",
+      "name": "Full Notion Sync",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "parameters": {
+        "command": "cd /home/ubuntu/job-agent && npx ts-node agents/notion-sync/index.ts 2>&1"
+      }
+    },
+    {
+      "id": "telegram-done",
+      "name": "Telegram: Sync Done",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [700, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "chat_id", "value": "={{$env.TELEGRAM_CHAT_ID}}" },
+            { "name": "text", "value": "🔄 Notion sync complete." },
+            { "name": "parse_mode", "value": "Markdown" }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": { "main": [[{ "node": "Full Notion Sync", "type": "main", "index": 0 }]] },
+    "Full Notion Sync": { "main": [[{ "node": "Telegram: Sync Done", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" }
+}

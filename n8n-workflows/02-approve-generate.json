@@ -1,0 +1,76 @@
+{
+  "name": "02 — Approve & Generate",
+  "nodes": [
+    {
+      "id": "webhook-trigger",
+      "name": "Webhook: Approve",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "webhookId": "approve",
+      "parameters": {
+        "path": "approve",
+        "httpMethod": "POST",
+        "responseMode": "onReceived",
+        "responseData": "firstEntryJson"
+      }
+    },
+    {
+      "id": "run-resume-gen",
+      "name": "Generate Resume + Cover Letter",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "parameters": {
+        "command": "=cd /home/ubuntu/job-agent && npx ts-node agents/resume-generator/index.ts --id={{$json.body.id}} 2>&1"
+      }
+    },
+    {
+      "id": "run-auto-apply",
+      "name": "Auto Apply",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "parameters": {
+        "command": "=cd /home/ubuntu/job-agent && npx ts-node agents/auto-apply/index.ts --id={{$('Webhook: Approve').item.json.body.id}} 2>&1"
+      }
+    },
+    {
+      "id": "run-notion-sync",
+      "name": "Sync to Notion",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [950, 300],
+      "parameters": {
+        "command": "=cd /home/ubuntu/job-agent && npx ts-node agents/notion-sync/index.ts --id={{$('Webhook: Approve').item.json.body.id}} 2>&1"
+      }
+    },
+    {
+      "id": "telegram-applied",
+      "name": "Telegram: Applied",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1200, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "chat_id", "value": "={{$env.TELEGRAM_CHAT_ID}}" },
+            { "name": "text", "value": "=✅ *Application Submitted*\n\n*Company:* {{$('Webhook: Approve').item.json.body.company}}\n*Role:* {{$('Webhook: Approve').item.json.body.role}}\n\nGood luck! 🚀" },
+            { "name": "parse_mode", "value": "Markdown" }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook: Approve": { "main": [[{ "node": "Generate Resume + Cover Letter", "type": "main", "index": 0 }]] },
+    "Generate Resume + Cover Letter": { "main": [[{ "node": "Auto Apply", "type": "main", "index": 0 }]] },
+    "Auto Apply": { "main": [[{ "node": "Sync to Notion", "type": "main", "index": 0 }]] },
+    "Sync to Notion": { "main": [[{ "node": "Telegram: Applied", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" }
+}

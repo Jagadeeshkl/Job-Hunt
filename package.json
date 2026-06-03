@@ -1,0 +1,21 @@
+{
+  "name": "job-agent",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "cd dashboard && pnpm dev",
+    "build": "cd dashboard && pnpm build",
+    "scrape": "npx ts-node agents/scraper/index.ts",
+    "match": "npx ts-node agents/matcher/index.ts",
+    "email": "npx ts-node agents/email-monitor/index.ts",
+    "test-agents": "bash scripts/test-all-agents.sh",
+    "setup": "bash scripts/setup.sh"
+  },
+  "workspaces": [
+    "agents",
+    "dashboard"
+  ],
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1"
+  }
+}

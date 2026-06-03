@@ -1,0 +1,63 @@
+{
+  "name": "01 — Daily Scrape & Match",
+  "nodes": [
+    {
+      "id": "cron-trigger",
+      "name": "Daily Cron 8AM IST",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "30 2 * * *" }]
+        }
+      }
+    },
+    {
+      "id": "run-scraper",
+      "name": "Run Scraper",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "parameters": {
+        "command": "cd /home/ubuntu/job-agent && npx ts-node agents/scraper/index.ts 2>&1"
+      }
+    },
+    {
+      "id": "run-matcher",
+      "name": "Run Matcher",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "parameters": {
+        "command": "cd /home/ubuntu/job-agent && npx ts-node agents/matcher/index.ts 2>&1"
+      }
+    },
+    {
+      "id": "telegram-summary",
+      "name": "Telegram Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [950, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "chat_id", "value": "={{$env.TELEGRAM_CHAT_ID}}" },
+            { "name": "text", "value": "=📊 *Daily Job Agent Run Complete*\n\nScraper + Matcher finished. Check your dashboard for new matches." },
+            { "name": "parse_mode", "value": "Markdown" }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily Cron 8AM IST": { "main": [[{ "node": "Run Scraper", "type": "main", "index": 0 }]] },
+    "Run Scraper": { "main": [[{ "node": "Run Matcher", "type": "main", "index": 0 }]] },
+    "Run Matcher": { "main": [[{ "node": "Telegram Summary", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" }
+}

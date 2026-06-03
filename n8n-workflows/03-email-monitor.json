@@ -1,0 +1,32 @@
+{
+  "name": "03 — Email Monitor",
+  "nodes": [
+    {
+      "id": "cron-15min",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "*/15 * * * *" }]
+        }
+      }
+    },
+    {
+      "id": "run-email-monitor",
+      "name": "Run Email Monitor",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "parameters": {
+        "command": "cd /home/ubuntu/job-agent && npx ts-node agents/email-monitor/index.ts 2>&1"
+      }
+    }
+  ],
+  "connections": {
+    "Every 15 Minutes": { "main": [[{ "node": "Run Email Monitor", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" }
+}

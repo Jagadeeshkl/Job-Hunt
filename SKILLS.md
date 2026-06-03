@@ -1,10 +1,19 @@
 # SKILLS.md — External Integrations Reference
 
-## Anthropic Claude API
-- Endpoint: https://api.anthropic.com/v1/messages
-- Model: claude-sonnet-4-6
-- Used for: job matching, resume tailoring, cover letter, email classification
-- Docs: https://docs.anthropic.com/en/api/messages
+## Google Gemini API
+- Endpoint: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
+- Auth: header `x-goog-api-key: GOOGLE_API_KEY` (or `?key=` query param)
+- Primary model: gemini-2.5-flash-lite. Fallback chain (each a separate free
+  daily quota bucket): gemini-2.5-flash-lite, gemini-flash-lite-latest,
+  gemini-2.0-flash-lite, gemini-2.5-flash, gemini-flash-latest
+- Free tier: ~20 requests/day PER model → ~80-100/day across the chain
+- Used for: job matching, resume tailoring, cover letter, email classification,
+  interview question generation
+- All calls go through generateWithRetry() in agents/lib/gemini.ts (503 backoff,
+  instant skip of daily-exhausted models, per-minute rate-limit handling)
+- Docs: https://ai.google.dev/gemini-api/docs
+- NOTE: gemini-1.5-flash is deprecated (404) and gemini-2.0-flash has limit:0 on
+  this account — do not use either.
 
 ## Supabase
 - JS SDK: @supabase/supabase-js
@@ -14,15 +23,21 @@
 
 ## n8n REST API (for programmatic workflow import)
 - Base URL: http://localhost:5678/api/v1
-- Auth: n8n API key (set in n8n settings)
-- Import workflow: POST /workflows with JSON body
-- Activate workflow: PATCH /workflows/{id}/activate
+- Auth: header `X-N8N-API-KEY` (create in n8n → Settings → API)
+- Import workflow: POST /workflows — strip read-only fields first (`active`, `id`)
+- Activate workflow: POST /workflows/{id}/activate (NOT PATCH)
+- Delete workflow: DELETE /workflows/{id}
+- The container needs TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID in its env for the
+  Telegram nodes (`{{$env.TELEGRAM_BOT_TOKEN}}`) — provided via docker/.env.
 
 ## Apify API
-- Endpoint: https://api.apify.com/v2/acts/apify~google-search-scraper/runs
-- Auth: Bearer APIFY_API_TOKEN
-- Used for: Google Search queries to find new job URLs
-- Cost: ~$0.005 per search query
+- Endpoint: https://api.apify.com/v2/acts/apify~google-search-scraper/run-sync-get-dataset-items?token={APIFY_API_TOKEN}
+  (runs synchronously and returns dataset items directly — no polling)
+- Auth: token query param (APIFY_API_TOKEN)
+- Used for: Google Search discovery of NEW ATS boards (site:boards.greenhouse.io
+  / jobs.lever.co / jobs.ashbyhq.com + AI keywords + India locations)
+- Results parsed from item.organicResults[].url
+- Cost: ~$0.03 per run (3 queries)
 
 ## Greenhouse Public API (no auth required)
 - Jobs list: GET https://boards-api.greenhouse.io/v1/boards/{company}/jobs
@@ -36,7 +51,9 @@
 
 ## Ashby Public API (no auth required)
 - Jobs list: GET https://api.ashbyhq.com/posting-api/job-board/{company}
-- Returns: JSON array of job postings
+- Returns: JSON object { jobs: [...] } — NOT a bare array and NOT jobPostings.
+  Each job: title, location (string), jobUrl, descriptionPlain, isRemote,
+  isListed, compensation (string). Invalid board slug → HTTP 404.
 
 ## Gmail API
 - OAuth2 scope: https://www.googleapis.com/auth/gmail.readonly

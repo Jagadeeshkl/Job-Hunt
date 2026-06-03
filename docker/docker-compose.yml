@@ -1,9 +1,13 @@
-version: '3.8'
 services:
   n8n:
     image: n8nio/n8n
     ports:
       - "5678:5678"
+    # Telegram credentials for the workflow Telegram nodes ({{$env.TELEGRAM_*}})
+    # are loaded from docker/.env (gitignored). Copy docker/.env.example → docker/.env
+    # and fill in your values. Without it, the daily Telegram summary will fail.
+    env_file:
+      - .env
     environment:
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=admin

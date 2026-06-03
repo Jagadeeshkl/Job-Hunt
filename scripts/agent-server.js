@@ -12,6 +12,7 @@ const PORT = 3002;
 
 const AGENTS = {
   scraper:         ['npx', ['ts-node', 'agents/scraper/index.ts']],
+  discover:        ['npx', ['ts-node', 'agents/scraper/discover.ts']],
   matcher:         ['npx', ['ts-node', 'agents/matcher/index.ts']],
   'email-monitor': ['npx', ['ts-node', 'agents/email-monitor/index.ts']],
   'notion-sync':   ['npx', ['ts-node', 'agents/notion-sync/index.ts']],

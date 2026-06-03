@@ -1,7 +1,8 @@
 import fetch from 'node-fetch';
 import * as dotenv from 'dotenv';
+import path from 'path';
 
-dotenv.config({ path: '../../.env.local' });
+dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
 
 const APIFY_API_TOKEN = process.env.APIFY_API_TOKEN!;
 const ACTOR_ID = 'apify~google-search-scraper';
@@ -38,8 +39,10 @@ function parseAshbyUrl(url: string): { ats_id: string; job_url: string } | null 
 }
 
 async function runApifyActor(query: string): Promise<string[]> {
-  const runRes = await fetch(
-    `https://api.apify.com/v2/acts/${ACTOR_ID}/runs?token=${APIFY_API_TOKEN}`,
+  // run-sync-get-dataset-items blocks until the run finishes and returns the
+  // dataset directly — simpler and more reliable than creating a run + polling.
+  const res = await fetch(
+    `https://api.apify.com/v2/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${APIFY_API_TOKEN}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -51,33 +54,12 @@ async function runApifyActor(query: string): Promise<string[]> {
     }
   );
 
-  if (!runRes.ok) {
-    console.warn(`[apify] Actor run failed: ${runRes.status}`);
+  if (!res.ok) {
+    console.warn(`[apify] Actor run failed: ${res.status}`);
     return [];
   }
 
-  const runData: any = await runRes.json();
-  const runId = runData?.data?.id;
-  if (!runId) return [];
-
-  // Poll until finished (max 60s)
-  for (let i = 0; i < 12; i++) {
-    await new Promise(r => setTimeout(r, 5000));
-    const statusRes = await fetch(
-      `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_API_TOKEN}`
-    );
-    const statusData: any = await statusRes.json();
-    if (statusData?.data?.status === 'SUCCEEDED') break;
-    if (['FAILED', 'ABORTED', 'TIMED-OUT'].includes(statusData?.data?.status ?? '')) {
-      console.warn(`[apify] Run ${runId} ended with: ${statusData?.data?.status}`);
-      return [];
-    }
-  }
-
-  const datasetRes = await fetch(
-    `https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${APIFY_API_TOKEN}&format=json`
-  );
-  const items: any[] = await datasetRes.json();
+  const items: any[] = await res.json();
 
   return items.flatMap((item: any) =>
     (item.organicResults ?? []).map((r: any) => r.url as string).filter(Boolean)

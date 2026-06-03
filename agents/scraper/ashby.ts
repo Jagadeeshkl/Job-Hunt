@@ -33,17 +33,19 @@ export async function fetchAshbyJobs(
     return [];
   }
 
-  const jobs: any[] = data?.jobPostings ?? [];
+  // Ashby's public posting-api returns { jobs: [...] }, not { jobPostings }.
+  const jobs: any[] = data?.jobs ?? [];
   const results: JobListing[] = [];
 
   for (const job of jobs) {
+    if (job.isListed === false) continue; // skip unlisted/closed postings
     if (!matchesAiKeywords(job.title ?? '')) continue;
 
-    const jdText = job.descriptionPlain ?? job.description ?? '';
+    const jdText = job.descriptionPlain ?? job.descriptionHtml ?? '';
     const location =
       job.isRemote
         ? 'Remote'
-        : job.locationName ?? job.location ?? 'Unknown';
+        : job.location ?? job.address?.postalAddress?.addressLocality ?? 'Unknown';
 
     results.push({
       company: companyName,
@@ -55,7 +57,7 @@ export async function fetchAshbyJobs(
       ats_type: 'greenhouse', // normalised; caller sets actual ats_type
       location,
       salary_range:
-        job.compensationTierSummary ?? null,
+        typeof job.compensation === 'string' ? job.compensation : null,
     });
   }
 

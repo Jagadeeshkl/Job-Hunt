@@ -1,14 +1,13 @@
 import * as dotenv from 'dotenv';
 import path from 'path';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 import { generateCoverLetter } from './cover-letter';
 import { buildResumePdf, buildCoverLetterPdf } from './pdf-builder';
+import { generateWithRetry } from '../lib/gemini';
 import baseResumeTemplate from './base-resume.json';
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!
@@ -19,16 +18,6 @@ const idArg = args.find(a => a.startsWith('--id='));
 const applicationId = idArg ? idArg.split('=')[1] : null;
 
 async function tailorResume(application: any, baseResume: any): Promise<any> {
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash-lite',
-    systemInstruction:
-      'You are an expert resume writer for AI/ML engineers. You write ATS-optimised resumes that pass automated screening.',
-    generationConfig: {
-      responseMimeType: 'application/json',
-      maxOutputTokens: 4096,
-    },
-  });
-
   const prompt = `Tailor this base resume for this specific job. Inject the ATS keywords naturally. Emphasise matching skills. Keep it honest — do not fabricate experience.
 
 BASE RESUME:
@@ -51,8 +40,16 @@ Return ONLY valid JSON matching this schema:
   "projects": [{ "name": "", "description": "", "tech": [] }]
 }`;
 
-  const result = await model.generateContent(prompt);
-  return JSON.parse(result.response.text());
+  const text = await generateWithRetry(prompt, {
+    tag: 'resume-gen',
+    systemInstruction:
+      'You are an expert resume writer for AI/ML engineers. You write ATS-optimised resumes that pass automated screening.',
+    generationConfig: {
+      responseMimeType: 'application/json',
+      maxOutputTokens: 4096,
+    },
+  });
+  return JSON.parse(text);
 }
 
 async function uploadToStorage(

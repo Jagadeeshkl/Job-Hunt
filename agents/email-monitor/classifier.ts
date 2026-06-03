@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateWithRetry } from '../lib/gemini';
 
 export type EmailClassification =
   | 'interview_invite'
@@ -18,18 +18,16 @@ export async function classifyEmail(
   body: string
 ): Promise<EmailClassification> {
   try {
-    // Construct lazily so GOOGLE_API_KEY is read after the caller's dotenv.config().
-    const genai = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
-    const model = genai.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
-    const result = await model.generateContent(
+    const text = await generateWithRetry(
       `Classify this recruiter email. Return ONLY one of these exact strings with no explanation:
 interview_invite | test_assignment | screening_call | rejection | follow_up | marketing_spam
 
 Email subject: ${subject}
-Email body: ${body.slice(0, 800)}`
+Email body: ${body.slice(0, 800)}`,
+      { tag: 'classifier' }
     );
 
-    const raw = result.response.text().trim().replace(/"/g, '').toLowerCase();
+    const raw = text.replace(/"/g, '').toLowerCase();
 
     if (VALID_CLASSES.includes(raw as EmailClassification)) {
       return raw as EmailClassification;

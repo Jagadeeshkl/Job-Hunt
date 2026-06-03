@@ -20,7 +20,7 @@ const applicationId = idArg ? idArg.split('=')[1] : null;
 
 async function tailorResume(application: any, baseResume: any): Promise<any> {
   const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.5-flash-lite',
     systemInstruction:
       'You are an expert resume writer for AI/ML engineers. You write ATS-optimised resumes that pass automated screening.',
     generationConfig: {

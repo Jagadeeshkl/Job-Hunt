@@ -18,9 +18,9 @@ const AGENTS = {
 };
 
 const AGENTS_WITH_ID = {
-  'resume-generator': (id) => ['npx', ['ts-node', 'agents/resume-generator/index.ts', '--id', id]],
-  'auto-apply':       (id) => ['npx', ['ts-node', 'agents/auto-apply/index.ts', '--id', id]],
-  'notion-sync-id':   (id) => ['npx', ['ts-node', 'agents/notion-sync/index.ts', '--id', id]],
+  'resume-generator': (id) => ['npx', ['ts-node', 'agents/resume-generator/index.ts', `--id=${id}`]],
+  'auto-apply':       (id) => ['npx', ['ts-node', 'agents/auto-apply/index.ts', `--id=${id}`]],
+  'notion-sync-id':   (id) => ['npx', ['ts-node', 'agents/notion-sync/index.ts', `--id=${id}`]],
 };
 
 function runAgent(cmd, args, res) {

@@ -1,8 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const genai = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
-const model = genai.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
 export type EmailClassification =
   | 'interview_invite'
   | 'test_assignment'
@@ -21,6 +18,9 @@ export async function classifyEmail(
   body: string
 ): Promise<EmailClassification> {
   try {
+    // Construct lazily so GOOGLE_API_KEY is read after the caller's dotenv.config().
+    const genai = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
+    const model = genai.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
     const result = await model.generateContent(
       `Classify this recruiter email. Return ONLY one of these exact strings with no explanation:
 interview_invite | test_assignment | screening_call | rejection | follow_up | marketing_spam

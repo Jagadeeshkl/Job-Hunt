@@ -1,7 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
-
 export async function generateCoverLetter(params: {
   company: string;
   role: string;
@@ -10,8 +8,10 @@ export async function generateCoverLetter(params: {
 }): Promise<string> {
   const { company, role, jdText, resumeJson } = params;
 
+  // Construct lazily so GOOGLE_API_KEY is read after the caller's dotenv.config().
+  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
   const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.5-flash-lite',
     systemInstruction:
       'You are an expert cover letter writer for AI/ML engineers. You write confident, direct, non-sycophantic cover letters.',
   });

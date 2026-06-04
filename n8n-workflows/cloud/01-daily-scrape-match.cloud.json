@@ -1,0 +1,162 @@
+{
+  "name": "01 — Daily Scrape & Match",
+  "_note": "SANITIZED snapshot of the LIVE n8n Cloud workflow (id ZZPsOF8vwttSIuZz). Cloud-native: Apify HTTP + Code + Supabase nodes (does NOT call the host agents). Secrets redacted — replace YOUR_APIFY_API_TOKEN and YOUR_GEMINI_API_KEY before importing. Telegram uses $env.TELEGRAM_BOT_TOKEN / $env.TELEGRAM_CHAT_ID. This file is a reference export and is NOT auto-synced to cloud.",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [ { "field": "cronExpression", "expression": "30 2 * * *" } ] } },
+      "id": "fb577985-fd6f-46ed-a2f7-2399883b785b",
+      "name": "Daily 8AM IST",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, 192]
+    },
+    {
+      "parameters": { "jsCode": "const companies = $input.all().map(i => ({\n  name: i.json.name,\n  ats: i.json.ats_type,\n  id: i.json.ats_id\n}));\nconst KW=[\"ai\",\"ml\",\"machine learning\",\"genai\",\"llm\",\"nlp\",\"computer vision\",\"data scientist\",\"mlops\",\"ai engineer\",\"research scientist\",\"deep learning\",\"generative\",\"foundation model\"];\nconst hasAI=t=>{const l=(t||\"\").toLowerCase();return KW.some(k=>l.includes(k));};\nconst strip=h=>(h||\"\").replace(/<[^>]+>/g,\" \").replace(/\\s{2,}/g,\" \").trim().slice(0,3000);\nconst results=[];const seen=new Set();\nfor(const c of companies){\n  try{\n    let url;\n    if(c.ats===\"greenhouse\")url=\"https://boards-api.greenhouse.io/v1/boards/\"+c.id+\"/jobs?content=true\";\n    else if(c.ats===\"lever\")url=\"https://api.lever.co/v0/postings/\"+c.id+\"?content=true\";\n    else url=\"https://api.ashbyhq.com/posting-api/job-board/\"+c.id;\n    const r=await fetch(url,{headers:{\"User-Agent\":\"JobAgent/1.0\"}});\n    if(!r.ok)continue;\n    const d=await r.json();\n    let jobs=[];\n    if(c.ats===\"greenhouse\")jobs=(d.jobs||[]).filter(j=>hasAI(j.title)).map(j=>({company:c.name,role:j.title,jd_url:j.absolute_url||\"\",jd_text:strip(j.content),ats_type:\"greenhouse\",location:(j.location&&j.location.name)||\"Remote\",status:\"scraped\"}));\n    else if(c.ats===\"lever\")jobs=(Array.isArray(d)?d:[]).filter(j=>hasAI(j.text)).map(j=>({company:c.name,role:j.text,jd_url:j.hostedUrl||\"\",jd_text:strip(j.descriptionBody||j.description),ats_type:\"lever\",location:(j.categories&&j.categories.location)||\"Remote\",status:\"scraped\"}));\n    else jobs=((d.jobPostings||[])).filter(j=>hasAI(j.title)).map(j=>({company:c.name,role:j.title,jd_url:j.externalLink||\"\",jd_text:strip(j.descriptionBody),ats_type:\"ashby\",location:(j.locationNames&&j.locationNames[0])||\"Remote\",status:\"scraped\"}));\n    for(const job of jobs){if(job.jd_url&&!seen.has(job.jd_url)){seen.add(job.jd_url);results.push({json:job});}}\n  }catch(e){}\n}\nreturn results.length?results:[{json:{jd_url:\"\",status:\"scraped\"}}];" },
+      "id": "1fa8dcf4-8c7b-493b-967e-c92e6ec02497",
+      "name": "Scrape All ATS Companies",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 192]
+    },
+    {
+      "parameters": { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose", "version": 1 }, "conditions": [ { "leftValue": "={{ $json.jd_url }}", "operator": { "type": "string", "operation": "notEmpty" } } ], "combinator": "and" }, "options": {} },
+      "id": "907a627f-2b53-441b-be5b-7ee698d8eba5",
+      "name": "Filter Real Jobs",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [448, 192]
+    },
+    {
+      "parameters": { "tableId": "applications", "dataToSend": "autoMapInputData" },
+      "id": "70687b3c-da21-49a7-994c-5a3a83755e4b",
+      "name": "Insert Job to Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [780, 500],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": { "operation": "getAll", "tableId": "applications", "limit": 30, "orderBy": "created_at.desc", "matchType": "allFilters", "filters": { "conditions": [ { "keyName": "status", "condition": "eq", "keyValue": "scraped" } ] } },
+      "id": "033a5dad-3d69-43f0-b7ff-551e4422d489",
+      "name": "Get Unscored Jobs",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [896, 192]
+    },
+    {
+      "parameters": { "jsCode": "const item = $input.first().json;\nconst prompt = \"Score this job against candidate profile.\\n\\nCANDIDATE: AI/ML Engineer, 3+ yrs Python/PyTorch/LangChain/LLMs/MLOps. B.Tech CS.\\n\\nJOB (\" + item.company + \" — \" + item.role + \"):\\n\" + (item.jd_text||\"\").slice(0,1500) + \"\\n\\nReturn ONLY valid JSON (no markdown):\\n{\\\"match_score\\\":<0-100>,\\\"matched_skills\\\":[\\\"skill\\\"],\\\"missing_skills\\\":[\\\"skill\\\"],\\\"match_justification\\\":\\\"3 concise bullet points\\\"}\";\nreturn [{json:{\n  _job_id: item.id,\n  gemini_request:{\n    systemInstruction:{parts:[{text:\"You are an expert ATS resume analyst for AI/ML roles. Return valid JSON only, no markdown fences.\"}]},\n    contents:[{role:\"user\",parts:[{text:prompt}]}],\n    generationConfig:{temperature:0.1,maxOutputTokens:512,responseMimeType:\"application/json\"}\n  }\n}}];" },
+      "id": "1be26a11-d446-4820-a023-3b819e7b33e9",
+      "name": "Prepare Gemini Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1344, 192]
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=YOUR_GEMINI_API_KEY", "sendBody": true, "specifyBody": "json", "jsonBody": "={{ $json.gemini_request }}", "options": { "response": { "response": { "neverError": true } } } },
+      "id": "3f66d41b-25a0-495a-9208-4e44da3f1dd7",
+      "name": "Score with Gemini",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1568, 192]
+    },
+    {
+      "parameters": { "jsCode": "const resp = $input.first().json;\nconst text = (resp.candidates&&resp.candidates[0]&&resp.candidates[0].content&&resp.candidates[0].content.parts&&resp.candidates[0].content.parts[0]&&resp.candidates[0].content.parts[0].text)||'{}';\nconst clean = text.replace(/```json[\\s\\S]*?```|```[\\s\\S]*?```/g,'').trim();\ntry {\n  const p = JSON.parse(clean);\n  return [{json:{match_score:p.match_score||0,match_justification:p.match_justification||\"\",missing_skills:p.missing_skills||[],matched_skills:p.matched_skills||[],status:(p.match_score||0)>=60?\"matched\":\"scraped\"}}];\n} catch(e) {\n  return [{json:{match_score:0,match_justification:\"Parse failed\",missing_skills:[],matched_skills:[],status:\"scraped\"}}];\n}" },
+      "id": "1863f5ef-e037-4f7b-b206-c531cdd274cb",
+      "name": "Parse Gemini Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1792, 192]
+    },
+    {
+      "parameters": { "operation": "update", "tableId": "applications", "filters": { "conditions": [ { "keyName": "id", "condition": "eq", "keyValue": "={{ $(\"Prepare Gemini Request\").item.json._job_id }}" } ] }, "fieldsUi": { "fieldValues": [ { "fieldId": "match_score", "fieldValue": "={{ $json.match_score }}" }, { "fieldId": "match_justification", "fieldValue": "={{ $json.match_justification }}" }, { "fieldId": "status", "fieldValue": "={{ $json.status }}" } ] } },
+      "id": "b3507914-2bea-48ce-af90-5c5d956eca63",
+      "name": "Save Match Score",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [2016, 272]
+    },
+    {
+      "parameters": { "options": {} },
+      "id": "86ab0820-5b12-448a-ba6b-c57d8f153170",
+      "name": "Score Each Job",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1120, 192]
+    },
+    {
+      "parameters": { "operation": "getAll", "tableId": "companies", "returnAll": true, "filterType": "manual", "matchType": "anyFilter", "filters": { "conditions": [ { "keyName": "active", "condition": "eq", "keyValue": "true" } ] } },
+      "id": "655f5a45-9ad2-4023-8773-6bcbd3077b1f",
+      "name": "Fetch Companies from Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-250, 192]
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://api.apify.com/v2/acts/2Tg1MBeNzfI43XJGx/run-sync-get-dataset-items", "sendQuery": true, "specifyQuery": "keypair", "queryParameters": { "parameters": [ { "name": "token", "value": "YOUR_APIFY_API_TOKEN" }, { "name": "timeout", "value": "120" }, { "name": "memory", "value": "512" } ] }, "sendBody": true, "contentType": "json", "specifyBody": "json", "jsonBody": "={{ $json.body }}", "options": { "timeout": 130000, "response": { "response": { "neverError": true } } } },
+      "id": "da288e65-3a25-499a-b267-e46b72e59d69",
+      "name": "Run Apify Google Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-250, 500]
+    },
+    {
+      "parameters": { "mode": "runOnceForAllItems", "jsCode": "const results=$input.all();const KW=[\"ai\",\"ml\",\"machine learning\",\"genai\",\"llm\",\"nlp\",\"data scientist\",\"mlops\",\"deep learning\",\"generative\",\"foundation model\"];const hasAI=t=>{const l=(t||\"\").toLowerCase();return KW.some(k=>l.includes(k));};const jobs=[];const seen=new Set();for(const item of results){const r=item.json||{};const url=r.url||\"\";if(!url)continue;let company=\"\",atsType=\"\";if(url.includes(\"boards.greenhouse.io\")){const m=url.match(/boards\\.greenhouse\\.io\\/([^\\/]+)/);if(m){company=m[1];atsType=\"greenhouse\";}}else if(url.includes(\"jobs.lever.co\")){const m=url.match(/jobs\\.lever\\.co\\/([^\\/]+)/);if(m){company=m[1];atsType=\"lever\";}}else if(url.includes(\"jobs.ashbyhq.com\")){const m=url.match(/jobs\\.ashbyhq\\.com\\/([^\\/]+)/);if(m){company=m[1];atsType=\"ashby\";}}if(!company||seen.has(url)||!hasAI(r.title||\"\"))continue;seen.add(url);jobs.push({company:company.replace(/-/g,\" \").replace(/\\b\\w/g,l=>l.toUpperCase()),role:(r.title||\"\").replace(/^Job Application for /,\"\").replace(/ at .+$/,\"\"),jd_url:url,jd_text:(r.snippet||\"\").slice(0,2000),ats_type:atsType,location:\"India\",status:\"scraped\"});}return jobs.length?jobs.map(j=>({json:j})):[{json:{jd_url:\"\",status:\"scraped\"}}];" },
+      "id": "f580f030-4d42-485c-b1af-0f4250f2b0d6",
+      "name": "Parse Google Job URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [100, 500]
+    },
+    {
+      "parameters": { "mode": "append", "numberInputs": 2 },
+      "id": "544fc1db-9a2a-4062-8f89-be61c8484033",
+      "name": "Merge All Sources",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [450, 400]
+    },
+    {
+      "parameters": { "batchSize": 1, "options": {} },
+      "id": "bf55ade5-c668-4a72-adfc-1e485156a513",
+      "name": "Insert One by One",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [580, 360]
+    },
+    {
+      "parameters": { "mode": "runOnceForAllItems", "jsCode": "return [\n  {json:{body:{q:'site:boards.greenhouse.io (\"AI Engineer\" OR \"ML Engineer\" OR \"LLM\" OR \"MLOps\") India', gl:'in', num:30}}},\n  {json:{body:{q:'site:jobs.lever.co (\"AI Engineer\" OR \"machine learning\" OR \"data scientist\") India', gl:'in', num:30}}},\n  {json:{body:{q:'site:jobs.ashbyhq.com (\"AI\" OR \"machine learning\" OR \"LLM\") India', gl:'in', num:30}}}\n];" },
+      "id": "d2b12f61-a386-4419-b2b2-e6bf054a989e",
+      "name": "Build Google Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-470, 500]
+    },
+    {
+      "parameters": { "method": "POST", "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage", "sendBody": true, "specifyBody": "json", "jsonBody": "={{ { \"chat_id\": $env.TELEGRAM_CHAT_ID, \"text\": \"Daily Job Agent run complete. Jobs scraped, inserted and scored — check your dashboard for new matches.\", \"parse_mode\": \"Markdown\" } }}", "options": { "response": { "response": { "neverError": true } } } },
+      "id": "8e6fb022-fe2e-45b5-991b-e7acc782ccc7",
+      "name": "Send Daily Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1344, 0]
+    }
+  ],
+  "connections": {
+    "Daily 8AM IST": { "main": [ [ { "node": "Fetch Companies from Supabase", "type": "main", "index": 0 }, { "node": "Build Google Queries", "type": "main", "index": 0 } ] ] },
+    "Build Google Queries": { "main": [ [ { "node": "Run Apify Google Search", "type": "main", "index": 0 } ] ] },
+    "Run Apify Google Search": { "main": [ [ { "node": "Parse Google Job URLs", "type": "main", "index": 0 } ] ] },
+    "Parse Google Job URLs": { "main": [ [ { "node": "Merge All Sources", "type": "main", "index": 1 } ] ] },
+    "Fetch Companies from Supabase": { "main": [ [ { "node": "Scrape All ATS Companies", "type": "main", "index": 0 } ] ] },
+    "Scrape All ATS Companies": { "main": [ [ { "node": "Merge All Sources", "type": "main", "index": 0 } ] ] },
+    "Merge All Sources": { "main": [ [ { "node": "Filter Real Jobs", "type": "main", "index": 0 } ] ] },
+    "Filter Real Jobs": { "main": [ [ { "node": "Insert One by One", "type": "main", "index": 0 } ] ] },
+    "Insert One by One": { "main": [ [ { "node": "Get Unscored Jobs", "type": "main", "index": 0 } ], [ { "node": "Insert Job to Supabase", "type": "main", "index": 0 } ] ] },
+    "Insert Job to Supabase": { "main": [ [ { "node": "Insert One by One", "type": "main", "index": 0 } ] ] },
+    "Get Unscored Jobs": { "main": [ [ { "node": "Score Each Job", "type": "main", "index": 0 } ] ] },
+    "Score Each Job": { "main": [ [ { "node": "Send Daily Summary", "type": "main", "index": 0 } ], [ { "node": "Prepare Gemini Request", "type": "main", "index": 0 } ] ] },
+    "Prepare Gemini Request": { "main": [ [ { "node": "Score with Gemini", "type": "main", "index": 0 } ] ] },
+    "Score with Gemini": { "main": [ [ { "node": "Parse Gemini Score", "type": "main", "index": 0 } ] ] },
+    "Parse Gemini Score": { "main": [ [ { "node": "Save Match Score", "type": "main", "index": 0 } ] ] },
+    "Save Match Score": { "main": [ [ { "node": "Score Each Job", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

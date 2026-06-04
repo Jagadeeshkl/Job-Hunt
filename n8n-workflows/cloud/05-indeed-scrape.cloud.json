@@ -1,0 +1,55 @@
+{
+  "name": "05 — Indeed Top-up (Mon & Thu)",
+  "_note": "SANITIZED snapshot of the LIVE n8n Cloud workflow (id X7VAymVhfR1WeS4a). Cloud-native: Apify HTTP + Code + Supabase. The Apify call authenticates via an n8n HTTP Bearer Auth credential (Authorization: Bearer <APIFY_API_TOKEN>) — create/attach that credential after import; no secret is stored in this file. Per-item insert loop skips duplicate jd_url individually. NOT auto-synced to cloud.",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [ { "field": "cronExpression", "expression": "0 3 * * 1,4" } ] } },
+      "id": "8d0d4797-83bf-4720-83ef-9a8d4b5519bd",
+      "name": "Mon & Thu 8:30 IST",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, 300]
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://api.apify.com/v2/acts/hMvNSpz3JnHgl5jkh/run-sync-get-dataset-items", "authentication": "genericCredentialType", "genericAuthType": "httpBearerAuth", "sendQuery": true, "specifyQuery": "keypair", "queryParameters": { "parameters": [ { "name": "timeout", "value": "120" }, { "name": "memory", "value": "512" } ] }, "sendBody": true, "contentType": "json", "specifyBody": "json", "jsonBody": "={ \"position\": \"AI Engineer OR Machine Learning Engineer OR LLM Engineer OR GenAI\", \"country\": \"IN\", \"location\": \"Bangalore\", \"maxItemsPerSearch\": 15, \"saveOnlyUniqueItems\": true }", "options": { "timeout": 130000, "response": { "response": { "neverError": true } } } },
+      "id": "973877f5-1fa6-418b-9b48-2709c231a2d7",
+      "name": "Run Apify Indeed Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [220, 300]
+    },
+    {
+      "parameters": { "mode": "runOnceForAllItems", "jsCode": "const results=$input.all();const KW=[\"ai\",\"ml\",\"machine learning\",\"genai\",\"llm\",\"nlp\",\"data scientist\",\"mlops\",\"deep learning\",\"generative\",\"foundation model\",\"ai engineer\",\"ml engineer\"];const hasAI=t=>{const l=(t||\"\").toLowerCase();return KW.some(k=>l.includes(k));};const jobs=[];const seen=new Set();for(const item of results){const job=item.json;const url=job.url||\"\";const desc=(job.description||\"\").trim();if(!url||seen.has(url))continue;if(job.isExpired)continue;if(!hasAI(job.positionName||\"\"))continue;if(desc.length<300)continue;seen.add(url);jobs.push({company:job.company||\"Unknown\",role:job.positionName||\"\",jd_url:url,jd_text:desc.slice(0,5000),ats_type:\"custom\",is_manual_required:true,location:job.location||\"India\",salary_range:job.salary||null,status:\"scraped\"});}return jobs.map(j=>({json:j}));" },
+      "id": "d5e7ccbc-b305-499e-b50d-37c07b6b4e21",
+      "name": "Parse Indeed Jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": { "batchSize": 1, "options": {} },
+      "id": "071641b2-efd5-4106-8157-e20e4b57169b",
+      "name": "Insert One by One",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": { "tableId": "applications", "dataToSend": "autoMapInputData" },
+      "id": "88f65b03-215b-4a6e-b9b5-1987389bccd5",
+      "name": "Insert Indeed Jobs",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [660, 420],
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Mon & Thu 8:30 IST": { "main": [ [ { "node": "Run Apify Indeed Search", "type": "main", "index": 0 } ] ] },
+    "Run Apify Indeed Search": { "main": [ [ { "node": "Parse Indeed Jobs", "type": "main", "index": 0 } ] ] },
+    "Parse Indeed Jobs": { "main": [ [ { "node": "Insert One by One", "type": "main", "index": 0 } ] ] },
+    "Insert One by One": { "main": [ null, [ { "node": "Insert Indeed Jobs", "type": "main", "index": 0 } ] ] },
+    "Insert Indeed Jobs": { "main": [ [ { "node": "Insert One by One", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

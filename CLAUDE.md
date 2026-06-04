@@ -11,6 +11,11 @@ Autonomous job application system. Scrapes AI/ML jobs, scores them, generates ta
   5-model fallback chain (see agents/lib/gemini.ts) — each model name is a
   separate free daily quota bucket, giving ~80-100 free scores/day with no billing.
 - Job Discovery: Apify Google Search Scraper (free tier, ~$0.03/run of $5 credit)
+  — discovers ATS board slugs, then JD text is pulled from public ATS APIs.
+- Indeed (paid, separate cadence): Apify `misceres/indeed-scraper` (~$0.006/listing).
+  Returns fully structured jobs WITH description text directly — no ATS API.
+  NOT part of the daily run; runs Mon & Thu via Workflow 05. Backlog-aware and
+  capped per run (MAX_PER_RUN) to keep Apify spend predictable.
 - Job Data: Greenhouse, Lever, and Ashby public APIs (no auth needed)
 - Email: Gmail API with OAuth2
 - Alerts: Telegram Bot API (free)
@@ -47,15 +52,19 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 - AI is Google Gemini (not Claude). All Gemini calls go through
   `generateWithRetry()` in agents/lib/gemini.ts: 503 backoff, instant skip of
   daily-exhausted models, fallback across 5 models.
-- Never use Playwright on LinkedIn or Indeed (gets banned)
-- Only use Apify for Google Search discovery; fetch JD text from public ATS APIs
+- Never use Playwright on LinkedIn or Indeed (gets banned). Indeed is scraped
+  ONLY via the Apify `misceres/indeed-scraper` actor, never directly.
+- Use Apify for Google Search discovery (fetch JD text from public ATS APIs)
+  and for the Indeed top-up (JD text comes directly in the actor output).
+- Indeed jobs cannot be auto-applied (no ATS API) → stored as ats_type='custom'
+  with is_manual_required=true, so they land in the manual-apply queue.
 - Gemini is used for: job matching, resume tailoring, cover letter, email
   classification, interview question generation
 - Scraping is FREE (ATS + Apify); only matching/resume-gen cost Gemini quota.
   The matcher is the bottleneck, so daily-scrape is backlog-aware.
 - All PDFs generated with pdf-lib, uploaded to Supabase Storage
-- Daily cron runs at 08:00 UTC = 1:30 PM IST — just after the Gemini quota
-  resets (midnight US Pacific), so each run starts with a full budget.
+- Daily cron runs at 08:00 IST (02:30 UTC) — shortly after the Gemini quota
+  resets (midnight US Pacific), so each run starts with a near-full budget.
 - Daily order: MATCH backlog first (oldest jobs first), THEN top-up scrape.
 - Max 15 auto-applies per day to avoid spam flagging
 - Always deduplicate by jd_url; matcher only touches status='scraped' so no job
@@ -69,8 +78,9 @@ scraped → matched → approved → applied → interview_scheduled → assessm
 
 ## Agent Locations
 - Scraper (static list): agents/scraper/index.ts
-- Discovery (Apify → DB): agents/scraper/discover.ts
-- Daily backlog-aware scrape (list + Apify): agents/scraper/daily-scrape.ts
+- Discovery (Apify Google → DB): agents/scraper/discover.ts
+- Indeed scrape (Apify misceres → DB, manual queue): agents/scraper/indeed-search.ts
+- Daily backlog-aware scrape (list + Apify Google, free only): agents/scraper/daily-scrape.ts
 - Shared scrape/store helpers: agents/scraper/store.ts
 - Matcher: agents/matcher/
 - Shared Gemini retry/fallback helper: agents/lib/gemini.ts
@@ -81,7 +91,25 @@ scraped → matched → approved → applied → interview_scheduled → assessm
 - Notion Sync: agents/notion-sync/
 
 ## n8n Workflows
-4 workflow JSON files in n8n-workflows/. Workflow 01 = daily match-then-scrape.
+5 workflow JSON files in n8n-workflows/. Workflow 01 = daily match-then-scrape
+(08:00 IST). Workflow 05 = Indeed top-up, Mon & Thu 08:30 IST (lighter cadence
+to conserve Apify credit; calls /run/indeed). The agent server exposes
+/run/indeed for both the workflow and manual triggering.
 The n8n container needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID for its Telegram
 nodes — supplied via docker/.env (gitignored). Import via scripts/import-n8n-workflows.sh
 (or the Node importer that strips read-only fields and POSTs /activate).
+
+### Deployment note: Docker reference vs. live cloud
+The n8n-workflows/*.json files + scripts/agent-server.js are the SELF-HOSTABLE
+Docker reference (n8n in Docker calls the host agents over http://host.docker.
+internal:3002). The LIVE deployment, however, runs on n8n Cloud
+(jagadeeshkl.app.n8n.cloud), where WF01 and WF05 are "cloud-native" rebuilds:
+the scrape/insert/score logic lives directly in Apify HTTP + Code + Supabase
+nodes instead of calling the host agents. Two correctness fixes apply to BOTH:
+- Google discovery uses maxPagesPerQuery:3 (NOT resultsPerPage — that field is
+  invalid for apify/google-search-scraper and silently caps results at ~10).
+- Supabase inserts run one row at a time via a splitInBatches(batchSize 1) loop
+  so a single duplicate jd_url skips itself instead of failing the whole batch.
+  (In the host agents this is handled by ignore-duplicate upsert on jd_url.)
+When editing live workflows, do so via the n8n MCP against the cloud instance;
+the repo JSONs are not auto-synced to cloud.

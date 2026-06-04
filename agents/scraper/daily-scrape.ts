@@ -98,6 +98,9 @@ async function main() {
 
   const inserted = await insertJobs(supabase, [...fromList, ...fromApify]);
   console.log(`[daily-scrape] Done. ${inserted} new jobs inserted (backlog now ~${backlog + inserted}).`);
+  // Note: Indeed is intentionally NOT part of the daily run — it's a paid source
+  // ($0.006/listing) run on a lighter cadence via Workflow 05 (agents/scraper/
+  // indeed-search.ts). The daily run stays 100% free (curated list + Google).
 }
 
 main().catch(err => {

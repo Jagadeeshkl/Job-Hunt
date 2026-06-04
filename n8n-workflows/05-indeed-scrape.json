@@ -1,0 +1,53 @@
+{
+  "name": "05 — Indeed Top-up (2x / week)",
+  "nodes": [
+    {
+      "id": "cron-trigger",
+      "name": "Mon & Thu Cron",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "30 8 * * 1,4" }]
+        }
+      }
+    },
+    {
+      "id": "run-indeed",
+      "name": "Scrape Indeed (manual-apply queue)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [450, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3002/run/indeed",
+        "options": { "timeout": 600000 }
+      }
+    },
+    {
+      "id": "telegram-summary",
+      "name": "Telegram Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [700, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "chat_id", "value": "={{$env.TELEGRAM_CHAT_ID}}" },
+            { "name": "text", "value": "=🔎 *Indeed Top-up Complete*\n\nFresh Indeed jobs added to the manual-apply queue. The matcher will score them on the next daily run." },
+            { "name": "parse_mode", "value": "Markdown" }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Mon & Thu Cron": { "main": [[{ "node": "Scrape Indeed (manual-apply queue)", "type": "main", "index": 0 }]] },
+    "Scrape Indeed (manual-apply queue)": { "main": [[{ "node": "Telegram Summary", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

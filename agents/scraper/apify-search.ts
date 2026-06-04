@@ -47,9 +47,11 @@ async function runApifyActor(query: string): Promise<string[]> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        // `resultsPerPage` is NOT a valid field for this actor and was silently
+        // ignored, capping every query at a single page (~10 results). Each page
+        // is ~10 results, so maxPagesPerQuery: 3 yields ~30 candidate URLs/query.
         queries: query,
-        resultsPerPage: 20,
-        maxPagesPerQuery: 1,
+        maxPagesPerQuery: 3,
       }),
     }
   );

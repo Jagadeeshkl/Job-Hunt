@@ -5,7 +5,7 @@ import {
   X, SkipForward, Star, Check, ExternalLink, MapPin,
   Wallet, Sparkles, Inbox, Loader2,
 } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, parseJustification } from '../../lib/utils';
 import { MatchBadge } from '../../components/MatchBadge';
 
 interface ReviewJob {
@@ -209,10 +209,17 @@ export default function ReviewPage() {
               {/* Why */}
               {current.match_justification && (
                 <div className="rounded-xl bg-muted/50 p-4">
-                  <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     <Sparkles className="h-3 w-3 text-primary" /> Why it matched
                   </p>
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{current.match_justification}</p>
+                  <ul className="space-y-1.5">
+                    {parseJustification(current.match_justification).map((point, i) => (
+                      <li key={i} className="flex gap-2 text-sm leading-relaxed text-foreground">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                        <span>{point}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
 

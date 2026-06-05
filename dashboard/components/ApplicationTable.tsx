@@ -4,7 +4,7 @@ import { Fragment, useState } from 'react';
 import { ExternalLink, ChevronDown } from 'lucide-react';
 import { MatchBadge } from './MatchBadge';
 import { ApproveButton } from './ApproveButton';
-import { cn } from '../lib/utils';
+import { cn, parseJustification } from '../lib/utils';
 
 export interface Application {
   id: string;
@@ -157,8 +157,15 @@ export function ApplicationTable({ applications, onStatusChange }: Props) {
                 </tr>
                 {expanded === app.id && app.match_justification && (
                   <tr className="bg-muted/30">
-                    <td colSpan={8} className="whitespace-pre-wrap px-6 py-3 text-xs leading-relaxed text-muted-foreground">
-                      {app.match_justification}
+                    <td colSpan={8} className="px-6 py-3">
+                      <ul className="space-y-1.5">
+                        {parseJustification(app.match_justification).map((point, i) => (
+                          <li key={i} className="flex gap-2 text-xs leading-relaxed text-muted-foreground">
+                            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" />
+                            <span>{point}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </td>
                   </tr>
                 )}

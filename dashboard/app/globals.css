@@ -2,22 +2,95 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Refined enterprise theme — Workday DNA, elevated.
+  Light surfaces, deep-navy ink, confident blue primary, warm amber accent.
+  Tokens are HSL channels (consumed as hsl(var(--token)) in tailwind.config).
+*/
 :root {
-  --background: #0f0f13;
-  --foreground: #e2e8f0;
+  --background: 220 33% 97%;        /* cool light page */
+  --foreground: 222 38% 15%;        /* near-navy ink   */
+
+  --card: 0 0% 100%;
+  --card-foreground: 222 38% 15%;
+
+  --muted: 220 20% 94%;
+  --muted-foreground: 220 12% 46%;
+
+  --primary: 212 90% 44%;           /* Workday blue    */
+  --primary-foreground: 0 0% 100%;
+
+  --accent: 36 96% 50%;             /* warm amber      */
+  --accent-foreground: 28 80% 18%;
+
+  --success: 152 58% 40%;
+  --warning: 36 96% 50%;
+  --danger: 0 74% 52%;
+
+  --border: 220 18% 89%;
+  --input: 220 18% 89%;
+  --ring: 212 90% 44%;
+
+  /* sidebar (Workday-faithful: light, with a tinted-blue active state) */
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 222 20% 32%;
+  --sidebar-muted: 220 12% 55%;
+  --sidebar-active-bg: 212 92% 96%;
+  --sidebar-active-fg: 212 90% 40%;
+  --sidebar-border: 220 16% 91%;
+
+  --radius: 0.75rem;
+
+  --font-sans: var(--font-sans-next), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display-next), var(--font-sans);
+}
+
+* {
+  border-color: hsl(var(--border));
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
 }
 
 @layer components {
   .card {
-    @apply bg-gray-900 border border-gray-800 rounded-xl p-5;
+    background-color: hsl(var(--card));
+    color: hsl(var(--card-foreground));
+    border: 1px solid hsl(var(--border));
+    border-radius: 1rem;
+    box-shadow: 0 1px 2px hsl(222 40% 15% / 0.04), 0 1px 1px hsl(222 40% 15% / 0.03);
   }
   .pill {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  /* tabular numerals for stat figures */
+  .nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
   }
 }
+
+/* refined scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  background: hsl(220 14% 82%);
+  border: 3px solid hsl(var(--background));
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover { background: hsl(220 14% 72%); }
+
+@keyframes fade-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-rise { animation: fade-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }

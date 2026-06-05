@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
+import { ExternalLink, ChevronDown } from 'lucide-react';
 import { MatchBadge } from './MatchBadge';
 import { ApproveButton } from './ApproveButton';
+import { cn } from '../lib/utils';
 
 export interface Application {
   id: string;
@@ -17,30 +19,40 @@ export interface Application {
   resume_storage_url: string | null;
   cover_letter_storage_url: string | null;
   jd_url: string;
+  starred?: boolean;
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  scraped: 'bg-gray-800 text-gray-300',
-  matched: 'bg-blue-900 text-blue-300',
-  approved: 'bg-indigo-900 text-indigo-300',
-  applied: 'bg-purple-900 text-purple-300',
-  interview_scheduled: 'bg-green-900 text-green-300',
-  assessment: 'bg-yellow-900 text-yellow-300',
-  rejected: 'bg-red-900 text-red-300',
-  offer: 'bg-emerald-900 text-emerald-300',
+  scraped: 'bg-muted text-muted-foreground',
+  matched: 'bg-primary/10 text-primary',
+  approved: 'bg-primary/15 text-primary',
+  applied: 'bg-accent/15 text-accent',
+  interview_scheduled: 'bg-success/10 text-success',
+  assessment: 'bg-success/15 text-success',
+  rejected: 'bg-danger/10 text-danger',
+  dismissed: 'bg-muted text-muted-foreground',
+  offer: 'bg-success/20 text-success',
 };
 
 function SkillPills({ skills }: { skills: string[] | null }) {
-  if (!skills || skills.length === 0) return <span className="text-gray-600 text-xs">—</span>;
+  if (!skills || skills.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
   const visible = skills.slice(0, 3);
   const rest = skills.length - 3;
   return (
     <div className="flex flex-wrap gap-1">
       {visible.map(s => (
-        <span key={s} className="pill bg-gray-800 text-gray-300">{s}</span>
+        <span key={s} className="pill bg-muted text-muted-foreground">{s}</span>
       ))}
-      {rest > 0 && <span className="pill bg-gray-700 text-gray-400">+{rest}</span>}
+      {rest > 0 && <span className="pill bg-muted text-muted-foreground">+{rest}</span>}
     </div>
+  );
+}
+
+function Avatar({ name }: { name: string }) {
+  return (
+    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-xs font-bold uppercase text-primary">
+      {name.slice(0, 2)}
+    </span>
   );
 }
 
@@ -66,87 +78,95 @@ export function ApplicationTable({ applications, onStatusChange }: Props) {
 
   if (appList.length === 0) {
     return (
-      <div className="card text-center text-gray-500 py-12">
-        No applications found. Run the scraper to get started.
+      <div className="card grid place-items-center gap-2 py-16 text-center">
+        <p className="text-sm font-medium text-foreground">No applications found</p>
+        <p className="text-xs text-muted-foreground">Adjust the filters, or wait for the next daily run.</p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-800">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-800 bg-gray-900">
-            {['Company', 'Role', 'Score', 'Justification', 'Missing Skills', 'Status', 'Applied', 'Action'].map(h => (
-              <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-800">
-          {appList.map(app => (
-            <>
-              <tr key={app.id} className="bg-gray-950 hover:bg-gray-900 transition-colors">
-                <td className="px-4 py-3 font-medium">
-                  <a href={app.jd_url} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-400 transition-colors">
-                    {app.company}
-                  </a>
-                </td>
-                <td className="px-4 py-3 text-gray-300 max-w-xs truncate">{app.role}</td>
-                <td className="px-4 py-3"><MatchBadge score={app.match_score} /></td>
-                <td className="px-4 py-3">
-                  {app.match_justification ? (
-                    <button
-                      onClick={() => setExpanded(expanded === app.id ? null : app.id)}
-                      className="text-xs text-indigo-400 hover:text-indigo-300"
-                    >
-                      {expanded === app.id ? 'Hide' : 'View'}
-                    </button>
-                  ) : (
-                    <span className="text-gray-600 text-xs">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3"><SkillPills skills={app.missing_skills} /></td>
-                <td className="px-4 py-3">
-                  <span className={`pill ${STATUS_COLORS[app.status] ?? 'bg-gray-800 text-gray-300'}`}>
-                    {app.status.replace(/_/g, ' ')}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-gray-500 text-xs">
-                  {app.applied_at ? new Date(app.applied_at).toLocaleDateString() : '—'}
-                </td>
-                <td className="px-4 py-3">
-                  {app.status === 'matched' && !app.is_manual_required && (
-                    <ApproveButton applicationId={app.id} onStatusChange={handleStatusChange} />
-                  )}
-                  {app.status === 'approved' && app.resume_storage_url && (
-                    <div className="flex gap-2 text-xs">
-                      <a href={app.resume_storage_url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">Resume</a>
-                      {app.cover_letter_storage_url && (
-                        <a href={app.cover_letter_storage_url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">Cover</a>
-                      )}
+    <div className="card overflow-hidden p-0">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border bg-muted/40">
+              {['Company', 'Role', 'Score', 'Why', 'Missing Skills', 'Status', 'Applied', 'Action'].map(h => (
+                <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {appList.map(app => (
+              <Fragment key={app.id}>
+                <tr className="border-b border-border/70 transition-colors last:border-0 hover:bg-muted/40">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar name={app.company} />
+                      <a href={app.jd_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-foreground transition-colors hover:text-primary">
+                        {app.company}
+                        <ExternalLink className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+                      </a>
                     </div>
-                  )}
-                  {app.status === 'applied' && (
-                    <a href={app.jd_url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 hover:text-gray-300">View JD</a>
-                  )}
-                  {app.is_manual_required && app.status !== 'applied' && (
-                    <span className="pill bg-orange-900 text-orange-300">Manual</span>
-                  )}
-                </td>
-              </tr>
-              {expanded === app.id && app.match_justification && (
-                <tr key={`${app.id}-exp`} className="bg-gray-900">
-                  <td colSpan={8} className="px-6 py-3 text-xs text-gray-400 whitespace-pre-wrap">
-                    {app.match_justification}
+                  </td>
+                  <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">{app.role}</td>
+                  <td className="px-4 py-3"><MatchBadge score={app.match_score} /></td>
+                  <td className="px-4 py-3">
+                    {app.match_justification ? (
+                      <button
+                        onClick={() => setExpanded(expanded === app.id ? null : app.id)}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      >
+                        {expanded === app.id ? 'Hide' : 'View'}
+                        <ChevronDown className={cn('h-3 w-3 transition-transform', expanded === app.id && 'rotate-180')} />
+                      </button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3"><SkillPills skills={app.missing_skills} /></td>
+                  <td className="px-4 py-3">
+                    <span className={cn('pill capitalize', STATUS_COLORS[app.status] ?? 'bg-muted text-muted-foreground')}>
+                      {app.status.replace(/_/g, ' ')}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">
+                    {app.applied_at ? new Date(app.applied_at).toLocaleDateString() : '—'}
+                  </td>
+                  <td className="px-4 py-3">
+                    {app.status === 'matched' && !app.is_manual_required && (
+                      <ApproveButton applicationId={app.id} onStatusChange={handleStatusChange} />
+                    )}
+                    {app.status === 'approved' && app.resume_storage_url && (
+                      <div className="flex gap-3 text-xs font-medium">
+                        <a href={app.resume_storage_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Resume</a>
+                        {app.cover_letter_storage_url && (
+                          <a href={app.cover_letter_storage_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Cover</a>
+                        )}
+                      </div>
+                    )}
+                    {app.status === 'applied' && (
+                      <a href={app.jd_url} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-foreground">View JD</a>
+                    )}
+                    {app.is_manual_required && app.status !== 'applied' && (
+                      <span className="pill bg-accent/15 text-accent">Manual</span>
+                    )}
                   </td>
                 </tr>
-              )}
-            </>
-          ))}
-        </tbody>
-      </table>
+                {expanded === app.id && app.match_justification && (
+                  <tr className="bg-muted/30">
+                    <td colSpan={8} className="whitespace-pre-wrap px-6 py-3 text-xs leading-relaxed text-muted-foreground">
+                      {app.match_justification}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

@@ -53,8 +53,8 @@ export function ApproveButton({ applicationId, onStatusChange }: ApproveButtonPr
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-yellow-400 text-xs">
-        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+      <div className="flex items-center gap-2 text-xs font-medium text-accent">
+        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
         </svg>
@@ -64,15 +64,15 @@ export function ApproveButton({ applicationId, onStatusChange }: ApproveButtonPr
   }
 
   if (error) {
-    return <span className="text-red-400 text-xs">{error}</span>;
+    return <span className="text-xs text-danger">{error}</span>;
   }
 
   return (
     <button
       onClick={handleApprove}
-      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-lg font-medium transition-colors"
+      className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-soft transition-colors hover:bg-primary/90"
     >
-      Approve & Generate
+      Approve &amp; Generate
     </button>
   );
 }

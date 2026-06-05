@@ -10,6 +10,8 @@ export async function GET(req: NextRequest) {
   const minScore = searchParams.get('minScore');
   const maxScore = searchParams.get('maxScore');
   const search = searchParams.get('search');
+  const manual = searchParams.get('manual');
+  const starred = searchParams.get('starred');
 
   // Single application lookup (for polling)
   if (id) {
@@ -34,9 +36,16 @@ export async function GET(req: NextRequest) {
   if (minScore) query = query.gte('match_score', parseInt(minScore));
   if (maxScore) query = query.lte('match_score', parseInt(maxScore));
   if (search) query = query.ilike('company', `%${search}%`);
+  if (manual === 'true') query = query.eq('is_manual_required', true);
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ applications: data ?? [] });
+  // Filter in JS so we don't reference the `dismissed` enum value / `starred`
+  // column in SQL (keeps this working before the review-queue migration is run).
+  let apps = data ?? [];
+  if (!status || status === 'all') apps = apps.filter((a: any) => a.status !== 'dismissed');
+  if (starred === 'true') apps = apps.filter((a: any) => a.starred === true);
+
+  return NextResponse.json({ applications: apps });
 }

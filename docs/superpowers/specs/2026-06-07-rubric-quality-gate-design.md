@@ -99,7 +99,13 @@ compensation 0.05`.
 - **Parse Gemini Score:**
   - `match_score = round(Σ weight_i * dimensions[i].score)`.
   - `score_breakdown = dimensions` object.
-  - `status = match_score >= 60 ? 'matched' : 'scraped'`.
+  - `status = match_score >= 60 ? 'matched' : 'filtered'` (Option A). When below
+    the threshold, also set `match_justification = 'Below threshold (NN)'`.
+    Rationale: previously sub-60 jobs kept `status='scraped'`, so the scorer
+    (`Get Unscored Jobs` = `status='scraped'`) **re-scored them every run**,
+    wasting Gemini quota. Marking them `filtered` scores them exactly once.
+    They retain their full `score_breakdown` (unlike gate-filtered jobs, which
+    have none) so a low score is fully explained and recoverable.
   - `match_justification` = the six dimension reasons joined as bullet lines
     (keeps the existing "Why" display populated).
   - Defensive defaults if a dimension is missing (treat as 0 / "n/a").
@@ -132,6 +138,24 @@ before publishing the updated WF01.
 - Counts (`/api/counts`) unaffected (review = `status='matched'`).
 - ApplicationTable rubric display is optional/secondary.
 
+### 4a. Recoverability — viewing & restoring filtered jobs
+
+Filtered jobs (both gate-rejected and sub-60) are **never deleted** — they remain
+in `applications` with `status='filtered'`. To ensure the user can still reach a
+job they later become interested in:
+
+- **Applications page filter:** add a "Filtered / Low-score" option to the status
+  filter. The API already returns these when `?status=filtered` is passed
+  explicitly (the JS hide-rule only strips `filtered`/`dismissed` when status is
+  unset/`all`). Default views stay clean; this view is opt-in.
+- **Sort by score:** in that view, order by `match_score` desc so near-misses
+  (55–59) surface first. Distinguish the two kinds: low-score rows have a
+  `score_breakdown` + `match_justification='Below threshold (NN)'`; gate-filtered
+  rows have no `score_breakdown` and `match_justification='Filtered: <reason>'`.
+- **Restore action:** a "Restore to Review" button → `PATCH status='matched'`
+  (reuses the existing `/api/applications/[id]` route), pulling the job into the
+  Review queue. No data loss either way.
+
 ### 5. Repo agents (parity, secondary)
 
 Mirror the rubric in `agents/matcher/prompts.ts` (prompt) and
@@ -144,8 +168,14 @@ this is for consistency only.
 ```
 scrape → Filter Real Jobs → [Quality Gate] → Insert (status scraped|filtered)
   → Get Unscored (scraped only) → Gemini (6-dim rubric) → weighted avg
-  → Save (match_score + score_breakdown + status) → Review card renders rubric
+  → Save (match_score + score_breakdown + status matched|filtered)
+  → Review card renders rubric (matched);  filtered jobs browsable + restorable
 ```
+
+Statuses after scoring:
+- `matched`  — score ≥ 60 → Review queue.
+- `filtered` — gate-rejected (no breakdown) OR scored < 60 (has breakdown);
+  hidden by default, viewable via the Filtered/Low-score view, restorable.
 
 ## Cost / usage impact
 
@@ -180,6 +210,11 @@ scrape → Filter Real Jobs → [Quality Gate] → Insert (status scraped|filter
    equal to the weighted average (±1 rounding).
 4. Review card shows the 6-dimension breakdown with bars + reasons; old rows still
    render via the fallback.
-5. Filtered jobs do not appear in the Applications list or Review queue.
-6. No increase in Gemini requests per run vs. baseline (ideally a decrease).
+5. Filtered jobs do not appear in the default Applications list or Review queue,
+   but ARE reachable via the "Filtered / Low-score" view and can be restored to
+   Review with one click.
+6. Sub-60 jobs are scored exactly once (status `filtered`), not re-scored on
+   subsequent runs.
+7. No increase in Gemini requests per run vs. baseline (ideally a decrease, from
+   both the gate and the no-re-score fix).
 ```

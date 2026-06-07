@@ -1,19 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { PanelLeft, Search, MapPin } from 'lucide-react';
+import { PanelLeft, Search, MapPin, LogOut, ChevronDown } from 'lucide-react';
 import { ResumeUpload } from './ResumeUpload';
 import { Notifications } from './notifications';
 
 export function TopBar({ onToggle }: { onToggle: () => void }) {
   const router = useRouter();
   const [q, setQ] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const term = q.trim();
     router.push(term ? `/applications?search=${encodeURIComponent(term)}` : '/applications');
+  }
+
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  async function signOut() {
+    await fetch('/api/logout', { method: 'POST' }).catch(() => {});
+    router.replace('/login');
+    router.refresh();
   }
 
   return (
@@ -46,10 +62,27 @@ export function TopBar({ onToggle }: { onToggle: () => void }) {
 
         <Notifications />
 
-        <button className="flex items-center gap-2 rounded-full border border-border bg-background py-1 pl-1 pr-3 transition-colors hover:bg-muted">
-          <span className="grid h-7 w-7 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">J</span>
-          <span className="hidden text-sm font-medium text-foreground sm:block">Jagadeesh</span>
-        </button>
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setMenuOpen(o => !o)}
+            className="flex items-center gap-2 rounded-full border border-border bg-background py-1 pl-1 pr-2.5 transition-colors hover:bg-muted"
+          >
+            <span className="grid h-7 w-7 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">J</span>
+            <span className="hidden text-sm font-medium text-foreground sm:block">Jagadeesh</span>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+
+          {menuOpen && (
+            <div className="absolute right-0 mt-2 w-44 overflow-hidden rounded-xl border border-border bg-card shadow-lift">
+              <button
+                onClick={signOut}
+                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              >
+                <LogOut className="h-4 w-4 text-muted-foreground" /> Sign out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

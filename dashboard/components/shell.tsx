@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { cn } from '../lib/utils';
 import { AppSidebar } from './app-sidebar';
 import { TopBar } from './top-bar';
 import { ToastHost } from './toast';
 
 export function Shell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
   // Persist the collapsed preference across navigations / reloads.
@@ -21,6 +23,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
       return !prev;
     });
   }
+
+  // The login page renders full-screen, without the app chrome.
+  if (pathname === '/login') return <>{children}</>;
 
   return (
     <div className="min-h-screen">

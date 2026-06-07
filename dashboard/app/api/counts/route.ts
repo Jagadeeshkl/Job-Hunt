@@ -12,11 +12,12 @@ export async function GET() {
     return count ?? 0;
   };
 
-  const [review, manual, interviews] = await Promise.all([
+  const [review, manual, interviews, saved] = await Promise.all([
     countOf(q => q.eq('status', 'matched')),
     countOf(q => q.eq('is_manual_required', true).in('status', ['matched', 'approved'])),
     countOf(q => q.in('status', ['interview_scheduled', 'assessment', 'offer'])),
+    countOf(q => q.eq('starred', true)),
   ]);
 
-  return NextResponse.json({ review, manual, interviews });
+  return NextResponse.json({ review, manual, interviews, saved });
 }

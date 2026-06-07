@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { cn } from '../lib/utils';
 import { AppSidebar } from './app-sidebar';
 import { TopBar } from './top-bar';
+import { ToastHost } from './toast';
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -24,6 +25,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen">
       <AppSidebar collapsed={collapsed} />
+      <ToastHost />
       <div className={cn('flex min-h-screen flex-col transition-[padding] duration-300 ease-out', collapsed ? 'pl-[76px]' : 'pl-64')}>
         <TopBar onToggle={toggle} />
         <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-6 lg:px-8">

@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { PanelLeft, Search, Bell, MapPin } from 'lucide-react';
+import { PanelLeft, Search, MapPin } from 'lucide-react';
 import { ResumeUpload } from './ResumeUpload';
+import { Notifications } from './notifications';
 
 export function TopBar({ onToggle }: { onToggle: () => void }) {
   const router = useRouter();
@@ -43,13 +44,7 @@ export function TopBar({ onToggle }: { onToggle: () => void }) {
 
         <ResumeUpload />
 
-        <button
-          aria-label="Notifications"
-          className="relative grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <Bell className="h-[18px] w-[18px]" />
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-danger ring-2 ring-card" />
-        </button>
+        <Notifications />
 
         <button className="flex items-center gap-2 rounded-full border border-border bg-background py-1 pl-1 pr-3 transition-colors hover:bg-muted">
           <span className="grid h-7 w-7 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">J</span>

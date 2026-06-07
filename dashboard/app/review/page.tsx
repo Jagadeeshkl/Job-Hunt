@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { cn, parseJustification } from '../../lib/utils';
 import { MatchBadge } from '../../components/MatchBadge';
+import { emitSavedToast, emitNotifyRefresh } from '../../lib/events';
 
 interface ReviewJob {
   id: string;
@@ -73,8 +74,23 @@ export default function ReviewPage() {
     if (!current || busy) return;
     setBusy(true); setError(null);
     const next = !current.starred;
+    const job = current;
     setCards(prev => prev.map((c, i) => (i === 0 ? { ...c, starred: next } : c)));
-    try { await patch(current.id, { starred: next }); }
+    try {
+      await patch(job.id, { starred: next });
+      if (next) {
+        emitSavedToast({
+          company: job.company,
+          date: new Date().toLocaleString(undefined, {
+            year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+          }),
+          link: job.jd_url,
+        });
+        emitNotifyRefresh();
+      } else {
+        emitNotifyRefresh();
+      }
+    }
     catch (e) {
       setCards(prev => prev.map((c, i) => (i === 0 ? { ...c, starred: !next } : c)));
       setError(`Save failed — ${String(e instanceof Error ? e.message : e)} (did the DB migration run?)`);

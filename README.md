@@ -9,7 +9,7 @@ Autonomous job application system. Scrapes AI/ML job listings from Greenhouse, L
 
 ## Current flow (live)
 
-1. **Daily scrape + score** (n8n Cloud **WF01**, cron): scrape Greenhouse/Lever/
+1. **Scrape + score** (n8n Cloud **WF01**, cron **Mon/Wed/Fri 08:00 IST**): scrape Greenhouse/Lever/
    Ashby + Apify Google discovery → **Quality Gate** drops senior-title,
    **>5-years-experience**, thin, and off-target jobs (`status='filtered'`, never
    sent to Gemini) → Gemini scores survivors on a **6-dimension rubric**

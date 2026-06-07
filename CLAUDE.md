@@ -81,7 +81,7 @@ scraped → matched → approved → applied → interview_scheduled → assessm
 - `dismissed` — Review "Reject" or Excluded "Remove".
 
 ## Current dashboard flow (live — human-in-the-loop, manual apply)
-1. WF01 (n8n Cloud cron): scrape → **Quality Gate** (drop senior/>5y/thin/off-target
+1. WF01 (n8n Cloud cron, **Mon/Wed/Fri 08:00 IST**; scoring runs from the trigger, independent of the scrape loop): scrape → **Quality Gate** (drop senior/>5y/thin/off-target
    to `filtered`) → Gemini **6-dimension rubric** (stack/seniority/location/comp/
    evidence/mission, 0–100 each) → `match_score` = weighted average
    (.30/.20/.20/.15/.10/.05) → ≥60 `matched`, <60 `filtered`. Stored in JSONB

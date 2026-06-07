@@ -1,8 +1,43 @@
 # Job Agent
 
-Autonomous job application system. Scrapes AI/ML job listings from Greenhouse, Lever, and Ashby ATS APIs, scores them against your resume, generates tailored resumes and cover letters, auto-applies, monitors Gmail for responses, and syncs everything to Notion.
+Autonomous job application system. Scrapes AI/ML job listings from Greenhouse, Lever, and Ashby ATS APIs, scores them against your resume, generates tailored resumes and cover letters, and tracks every application through a dashboard.
 
-## Architecture
+> **Live deployment note:** the diagram and Docker/agent instructions further down
+> are the self-hostable **reference** design. The system actually runs on
+> **n8n Cloud + Supabase + a Next.js dashboard**, and is **human-in-the-loop /
+> manual-apply**. The current end-to-end flow is below.
+
+## Current flow (live)
+
+1. **Daily scrape + score** (n8n Cloud **WF01**, cron): scrape Greenhouse/Lever/
+   Ashby + Apify Google discovery → **Quality Gate** drops senior-title,
+   **>5-years-experience**, thin, and off-target jobs (`status='filtered'`, never
+   sent to Gemini) → Gemini scores survivors on a **6-dimension rubric**
+   (Stack · Seniority · Location · Compensation · Evidence · Mission, 0–100 each
+   with reasons) → `match_score` = weighted average (Stack .30 / Evidence .20 /
+   Seniority .20 / Mission .15 / Location .10 / Comp .05) → **≥60 = matched**,
+   **<60 = filtered** (scored once). Telegram summary.
+2. **Login** (`/login`) gates the dashboard (single-user cookie auth).
+3. **Review** (`/review`) / **Applications** (`/applications`): for a **matched**
+   job → **Generate docs** → Gemini tailors a resume + cover letter (locked
+   blue/white template → PDF → Supabase Storage) → status **approved**. The Review
+   card shows the 6-dimension breakdown bars.
+4. **Apply manually** (open the JD) → **Mark applied** → status **applied**; the
+   job moves to the **Dashboard** and leaves Applications.
+5. **Dashboard** (`/`) = your **applied** jobs (Company · Role · Date · JD link ·
+   Status) + stats / charts / activity. **Revert** sends an applied job back to
+   Applications.
+6. **Excluded** (`/filtered`) = gate-rejected + sub-60 jobs, sorted by score, each
+   with **Restore** (→ Review) or **Remove** (dismiss). Nothing is deleted —
+   everything is recoverable.
+7. **Saved** (`/saved`) + the notifications bell = jobs you star in Review.
+
+Resume/cover generation runs in the **dashboard** (`/api/approve`) because it
+renders HTML→PDF via a headless browser (Edge/Chrome), which n8n Cloud can't do.
+Edit live cloud workflows via the n8n MCP — the repo `n8n-workflows/*` are the
+Docker reference, not what's deployed.
+
+## Architecture (Docker reference — self-host)
 
 ```
 Curated company list  +  Apify Google-search discovery
@@ -121,20 +156,20 @@ Or run a script directly: `npx ts-node agents/matcher/index.ts`.
 
 ```
 scraped → matched → approved → applied → interview_scheduled → assessment → rejected / offer
+                 ↘ filtered (quality gate or score <60)        ↘ dismissed (rejected/removed)
 ```
 
-| Status | Set by |
+| Status | Set by (live) |
 |--------|--------|
-| `scraped` | scraper on insert |
-| `matched` | matcher after scoring |
-| `approved` | Telegram bot (manual) |
-| `applied` | auto-apply agent |
-| `interview_scheduled` | email-monitor |
-| `assessment` | email-monitor |
-| `rejected` | email-monitor |
-| `offer` | email-monitor |
+| `scraped` | WF01 scrape on insert |
+| `filtered` | WF01 Quality Gate (senior / >5y / thin / off-target) **or** score `<60`; hidden, shown on **Excluded** |
+| `matched` | WF01 matcher, `match_score ≥ 60` (with 6-dim `score_breakdown`) |
+| `approved` | dashboard **Generate docs** (resume + cover generated) |
+| `applied` | dashboard **Mark applied** (you applied manually) |
+| `interview_scheduled` / `assessment` / `rejected` / `offer` | email-monitor (or manual on the Interviews board) |
+| `dismissed` | Review **Reject** or Excluded **Remove** |
 
-Jobs with `is_manual_required = true` (Workday, custom portals) skip auto-apply and stay in the dashboard queue.
+`match_score` is the weighted average of the 6 rubric dimensions, stored alongside the JSONB `score_breakdown` column. Jobs with `is_manual_required = true` (Workday, custom portals) are applied externally, then marked applied.
 
 ## Key File Locations
 

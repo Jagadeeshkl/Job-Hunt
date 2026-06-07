@@ -75,6 +75,29 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 
 ## Application Status Pipeline
 scraped → matched → approved → applied → interview_scheduled → assessment → rejected → offer
+- `filtered` — set by WF01 Quality Gate (senior-title / **>5y experience** / thin /
+  off-target) OR by a rubric score `<60`. Never (re)scored; hidden from default
+  views; browsable on the dashboard **Excluded** page (Restore / Remove).
+- `dismissed` — Review "Reject" or Excluded "Remove".
+
+## Current dashboard flow (live — human-in-the-loop, manual apply)
+1. WF01 (n8n Cloud cron): scrape → **Quality Gate** (drop senior/>5y/thin/off-target
+   to `filtered`) → Gemini **6-dimension rubric** (stack/seniority/location/comp/
+   evidence/mission, 0–100 each) → `match_score` = weighted average
+   (.30/.20/.20/.15/.10/.05) → ≥60 `matched`, <60 `filtered`. Stored in JSONB
+   `score_breakdown` column (migration 002) + the new `filtered` enum value.
+2. Dashboard is **login-gated** (`/login`, cookie auth; creds in dashboard/.env.local:
+   DASHBOARD_EMAIL/PASSWORD + AUTH_TOKEN).
+3. **Applications** page (full filterable list, hides applied+ by default) → matched
+   job → **Generate docs** (`/api/approve`: Gemini-tailored resume+cover in the
+   locked blue/white template, HTML→PDF via headless Edge, uploaded to Supabase
+   Storage) → `approved`.
+4. **Mark applied** (after applying manually) → `applied`, moves to **Dashboard**.
+5. **Dashboard** (`/`) = applied jobs only (Company/Role/Date/JD link/Status) +
+   stats/charts/activity; **Revert** sends one back to Applications.
+6. **Excluded** (`/filtered`), **Saved** (`/saved`) + notifications bell, Review
+   queue (Approve/Skip/Reject/Save). base-resume.json is the single source of truth
+   for BOTH the matcher profile and the generated documents.
 
 ## Agent Locations
 - Scraper (static list): agents/scraper/index.ts

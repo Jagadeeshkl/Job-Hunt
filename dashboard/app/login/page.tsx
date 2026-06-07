@@ -4,10 +4,10 @@ import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Sparkles, Mail, Lock, Loader2, ArrowRight, Briefcase, Bot, BarChart3 } from 'lucide-react';
 
-// Job-hunt themed hero image (career / interview). Falls back to the blue
-// gradient overlay if it can't load.
+// Detective-themed hero (noir study: case files + notebook) for the "job hunt".
+// Falls back to the navy gradient overlay if it can't load.
 const HERO_IMAGE =
-  'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1400&q=80';
+  'https://images.unsplash.com/photo-1423592707957-3b212afa6733?auto=format&fit=crop&w=1400&q=80';
 
 function LoginInner() {
   const router = useRouter();
@@ -44,7 +44,7 @@ function LoginInner() {
       <div
         className="relative hidden flex-col justify-between overflow-hidden p-12 text-white lg:flex"
         style={{
-          backgroundImage: `linear-gradient(135deg, rgba(15,42,120,0.92), rgba(31,84,214,0.86)), url('${HERO_IMAGE}')`,
+          backgroundImage: `linear-gradient(135deg, rgba(7,15,38,0.90), rgba(23,55,140,0.80)), url('${HERO_IMAGE}')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
@@ -61,11 +61,11 @@ function LoginInner() {
 
         <div className="max-w-md">
           <h1 className="font-display text-4xl font-extrabold leading-tight">
-            Your job hunt, on autopilot.
+            On the case — your next role.
           </h1>
           <p className="mt-4 text-white/80">
-            Scrape, match, tailor, and apply — every day, automatically. Sign in to review
-            your matches and approve tailored resumes in one click.
+            Your AI detective scrapes, investigates, and matches roles every day — then
+            tailors the resume. Sign in to review the leads and approve in one click.
           </p>
 
           <ul className="mt-8 space-y-3 text-sm">

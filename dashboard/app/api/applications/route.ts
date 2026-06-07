@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   // Filter in JS so we don't reference the `dismissed` enum value / `starred`
   // column in SQL (keeps this working before the review-queue migration is run).
   let apps = data ?? [];
-  if (!status || status === 'all') apps = apps.filter((a: any) => a.status !== 'dismissed');
+  if (!status || status === 'all') apps = apps.filter((a: any) => a.status !== 'dismissed' && a.status !== 'filtered');
   if (starred === 'true') apps = apps.filter((a: any) => a.starred === true);
 
   return NextResponse.json({ applications: apps });

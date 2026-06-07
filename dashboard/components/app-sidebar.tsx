@@ -5,11 +5,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Inbox, Briefcase, ExternalLink,
-  CalendarCheck, BarChart3, Settings, Sparkles, Star,
+  CalendarCheck, BarChart3, Settings, Sparkles, Star, Filter,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-type BadgeKey = 'review' | 'manual' | 'interviews' | 'saved';
+type BadgeKey = 'review' | 'manual' | 'interviews' | 'saved' | 'filtered';
 
 const NAV: { href: string; label: string; icon: React.ElementType; badge?: BadgeKey }[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -19,11 +19,12 @@ const NAV: { href: string; label: string; icon: React.ElementType; badge?: Badge
   { href: '/manual', label: 'Manual Apply', icon: ExternalLink, badge: 'manual' },
   { href: '/interviews', label: 'Interviews', icon: CalendarCheck, badge: 'interviews' },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/filtered', label: 'Filtered', icon: Filter, badge: 'filtered' },
 ];
 
 export function AppSidebar({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname();
-  const [counts, setCounts] = useState<Record<BadgeKey, number>>({ review: 0, manual: 0, interviews: 0, saved: 0 });
+  const [counts, setCounts] = useState<Record<BadgeKey, number>>({ review: 0, manual: 0, interviews: 0, saved: 0, filtered: 0 });
 
   useEffect(() => {
     fetch('/api/counts')

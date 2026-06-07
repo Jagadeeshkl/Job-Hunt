@@ -8,6 +8,7 @@ import {
 import { cn, parseJustification } from '../../lib/utils';
 import { MatchBadge } from '../../components/MatchBadge';
 import { emitSavedToast, emitNotifyRefresh } from '../../lib/events';
+import { DIMENSIONS, scoreColor, type ScoreBreakdown } from '../../lib/score';
 
 interface ReviewJob {
   id: string;
@@ -24,6 +25,7 @@ interface ReviewJob {
   ats_type: string;
   is_manual_required: boolean;
   starred?: boolean;
+  score_breakdown?: ScoreBreakdown | null;
 }
 
 export default function ReviewPage() {
@@ -221,6 +223,33 @@ export default function ReviewPage() {
                   </div>
                 </div>
               ) : null}
+
+              {/* Score breakdown */}
+              {current.score_breakdown && (
+                <div>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Score breakdown
+                  </p>
+                  <div className="space-y-2">
+                    {DIMENSIONS.map(({ key, label }) => {
+                      const dim = current.score_breakdown?.[key];
+                      if (!dim) return null;
+                      return (
+                        <div key={key} className="grid grid-cols-[110px_64px_1fr] items-center gap-3">
+                          <span className="text-xs font-medium text-foreground">{label}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="h-1.5 w-9 overflow-hidden rounded-full bg-muted">
+                              <span className={cn('block h-full rounded-full', scoreColor(dim.score))} style={{ width: `${dim.score}%` }} />
+                            </span>
+                            <span className="nums text-xs font-semibold text-foreground">{dim.score}</span>
+                          </div>
+                          <span className="truncate text-xs text-muted-foreground" title={dim.reason}>{dim.reason}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Why */}
               {current.match_justification && (

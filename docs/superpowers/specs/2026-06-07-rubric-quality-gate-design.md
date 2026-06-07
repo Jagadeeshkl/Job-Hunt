@@ -56,6 +56,10 @@ Rules (all tunable constants at top of the node):
 - **Senior-only title:** title matches `/\b(staff|principal|lead|director|vp|vice
   president|head|manager)\b/i` → reject. "Senior" is intentionally NOT rejected
   (the rubric's seniority sub-score judges those).
+- **>5 years experience required:** the largest "N years/yrs" figure in `jd_text`
+  exceeds 5 ("5+" counts as 5.5) → reject. Candidate has ~1.6y, so >5y is a hard
+  mismatch. (Added post-approval at user request; applied to new scrapes and
+  backfilled over existing matched/scraped rows.)
 - **Thin description:** `jd_text.length < 300` → reject.
 - **Spam / non-target:** `jd_text`/title matches `/(unpaid|commission only|MLM|
   pyramid)/i`, OR title contains none of the AI/ML keyword set already used in

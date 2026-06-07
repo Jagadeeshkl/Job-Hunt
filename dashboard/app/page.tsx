@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Search, SlidersHorizontal, RefreshCw, Activity } from 'lucide-react';
+import { RefreshCw, Activity } from 'lucide-react';
 import { StatsCards } from '../components/StatsCards';
 import { ApplicationTable, type Application } from '../components/ApplicationTable';
 import {
@@ -9,7 +9,9 @@ import {
   PieChart, Pie, Cell, Legend, CartesianGrid,
 } from 'recharts';
 
-const STATUS_OPTIONS = ['all', 'scraped', 'matched', 'approved', 'applied', 'interview_scheduled', 'assessment', 'rejected', 'offer'];
+// Jobs you've applied to — the Dashboard's "applied pipeline". Generated-but-not-
+// applied ('approved') jobs stay on the Applications page until you Mark applied.
+const ACTIVE_STATUSES = ['applied', 'interview_scheduled', 'assessment', 'offer', 'rejected'];
 const PIE_COLORS = ['#0a7ae0', '#f59e0b', '#16a34a', '#7c3aed', '#e11d48', '#0891b2', '#65a30d', '#db2777'];
 
 interface Stats {
@@ -76,32 +78,23 @@ export default function DashboardPage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [scoreMin, setScoreMin] = useState(0);
-  const [scoreMax, setScoreMax] = useState(100);
-  const [search, setSearch] = useState('');
-
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (statusFilter !== 'all') params.set('status', statusFilter);
-      if (scoreMin > 0) params.set('minScore', String(scoreMin));
-      if (scoreMax < 100) params.set('maxScore', String(scoreMax));
-      if (search) params.set('search', search);
-
       const [statsRes, appsRes] = await Promise.all([
         fetch('/api/stats'),
-        fetch(`/api/applications?${params.toString()}`),
+        fetch('/api/applications'),
       ]);
       setStats(await statsRes.json());
       setApplications((await appsRes.json()).applications ?? []);
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, scoreMin, scoreMax, search]);
+  }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const activeApps = applications.filter(a => ACTIVE_STATUSES.includes(a.status));
 
   return (
     <div className="space-y-6">
@@ -125,41 +118,20 @@ export default function DashboardPage() {
       {/* Working surface: filters + table (2 cols) | activity (1 col) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          {/* Filters */}
-          <div className="card flex flex-wrap items-center gap-3 p-4">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <SlidersHorizontal className="h-4 w-4" />
-              <span className="text-xs font-semibold uppercase tracking-wider">Filters</span>
-            </div>
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="h-9 rounded-lg border border-border bg-background px-3 text-sm capitalize text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-            >
-              {STATUS_OPTIONS.map(s => (
-                <option key={s} value={s}>{s === 'all' ? 'All statuses' : s.replace(/_/g, ' ')}</option>
-              ))}
-            </select>
-            <div className="flex items-center gap-1.5">
-              <input type="number" min={0} max={100} value={scoreMin} onChange={e => setScoreMin(Number(e.target.value))}
-                className="h-9 w-16 rounded-lg border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
-              <span className="text-muted-foreground">–</span>
-              <input type="number" min={0} max={100} value={scoreMax} onChange={e => setScoreMax(Number(e.target.value))}
-                className="h-9 w-16 rounded-lg border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
-              <span className="text-xs text-muted-foreground">score</span>
-            </div>
-            <div className="relative min-w-[180px] flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Company name…"
-                className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
-            </div>
+          {/* Active pipeline — jobs you've acted on (full list lives on Applications) */}
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-sm font-bold text-foreground">Applied jobs</h2>
+            <span className="pill bg-muted text-muted-foreground nums">{activeApps.length}</span>
           </div>
-
-          {/* Table */}
           {loading ? (
-            <div className="card grid place-items-center py-16 text-sm text-muted-foreground">Loading applications…</div>
+            <div className="card grid place-items-center py-16 text-sm text-muted-foreground">Loading…</div>
+          ) : activeApps.length === 0 ? (
+            <div className="card grid place-items-center gap-2 py-16 text-center">
+              <p className="text-sm font-medium text-foreground">Nothing applied yet</p>
+              <p className="max-w-xs text-xs text-muted-foreground">On the Applications page, generate docs for a match, apply, then hit “Mark applied” to move it here.</p>
+            </div>
           ) : (
-            <ApplicationTable applications={applications} onStatusChange={() => fetchData()} />
+            <ApplicationTable applications={activeApps} onStatusChange={() => fetchData()} />
           )}
         </div>
 

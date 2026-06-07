@@ -6,6 +6,9 @@ import { Search, SlidersHorizontal, RefreshCw } from 'lucide-react';
 import { ApplicationTable, type Application } from '../../components/ApplicationTable';
 
 const STATUS_OPTIONS = ['all', 'scraped', 'matched', 'approved', 'applied', 'interview_scheduled', 'assessment', 'rejected', 'offer'];
+// Applied + downstream live on the Dashboard, so the default "all" view hides them
+// here (you can still pick them explicitly from the status dropdown).
+const HIDDEN_WHEN_ALL = ['applied', 'interview_scheduled', 'assessment', 'offer', 'rejected'];
 
 function ApplicationsInner() {
   const initialSearch = useSearchParams().get('search') ?? '';
@@ -34,13 +37,17 @@ function ApplicationsInner() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const visible = statusFilter === 'all'
+    ? applications.filter(a => !HIDDEN_WHEN_ALL.includes(a.status))
+    : applications;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Applications</h1>
           <p className="text-sm text-muted-foreground">
-            {loading ? 'Loading…' : `${applications.length} application${applications.length === 1 ? '' : 's'}`}
+            {loading ? 'Loading…' : `${visible.length} application${visible.length === 1 ? '' : 's'}`}
           </p>
         </div>
         <button onClick={fetchData} className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground shadow-soft transition-colors hover:bg-muted hover:text-foreground">
@@ -75,7 +82,7 @@ function ApplicationsInner() {
       {loading ? (
         <div className="card grid place-items-center py-16 text-sm text-muted-foreground">Loading applications…</div>
       ) : (
-        <ApplicationTable applications={applications} />
+        <ApplicationTable applications={visible} />
       )}
     </div>
   );

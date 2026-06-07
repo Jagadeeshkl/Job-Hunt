@@ -40,11 +40,21 @@ export default function FilteredPage() {
     });
   }
 
+  // Direct remove — dismiss the job so it leaves this list (and every view).
+  async function remove(id: string) {
+    setJobs(prev => prev.filter(j => j.id !== id));
+    await fetch(`/api/applications/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'dismissed' }),
+    });
+  }
+
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-display text-2xl font-bold text-foreground">Filtered / Low-score</h1>
-        <p className="text-sm text-muted-foreground">Jobs the gate skipped or that scored under 60. Nothing is deleted — restore any to Review.</p>
+        <h1 className="font-display text-2xl font-bold text-foreground">Excluded</h1>
+        <p className="text-sm text-muted-foreground">Auto-screened jobs (too senior, &gt;5y experience, thin or off-target) and sub-60 matches. <b>Restore</b> sends one back to Review; <b>Remove</b> dismisses it for good.</p>
       </div>
 
       {loading ? (
@@ -54,8 +64,8 @@ export default function FilteredPage() {
       ) : jobs.length === 0 ? (
         <div className="card grid place-items-center gap-3 py-24 text-center">
           <span className="grid h-14 w-14 place-items-center rounded-2xl bg-muted text-muted-foreground"><FilterIcon className="h-7 w-7" /></span>
-          <p className="font-display text-lg font-semibold text-foreground">Nothing filtered</p>
-          <p className="max-w-sm text-sm text-muted-foreground">Gate-rejected and sub-60 jobs will appear here.</p>
+          <p className="font-display text-lg font-semibold text-foreground">Nothing excluded</p>
+          <p className="max-w-sm text-sm text-muted-foreground">Auto-screened and sub-60 jobs will appear here.</p>
         </div>
       ) : (
         <div className="card overflow-hidden p-0">
@@ -79,8 +89,11 @@ export default function FilteredPage() {
                     <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">{j.role}</td>
                     <td className="px-4 py-3">{j.score_breakdown ? <MatchBadge score={j.match_score} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
                     <td className="max-w-sm truncate px-4 py-3 text-xs text-muted-foreground" title={j.match_justification ?? ''}>{j.match_justification ?? '—'}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button onClick={() => restore(j.id)} className="pill bg-primary/10 text-primary transition-colors hover:bg-primary/20">Restore to Review</button>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => restore(j.id)} className="pill bg-primary/10 text-primary transition-colors hover:bg-primary/20">Restore</button>
+                        <button onClick={() => remove(j.id)} className="pill bg-danger/10 text-danger transition-colors hover:bg-danger/20">Remove</button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -19,7 +19,7 @@ const NAV: { href: string; label: string; icon: React.ElementType; badge?: Badge
   { href: '/manual', label: 'Manual Apply', icon: ExternalLink, badge: 'manual' },
   { href: '/interviews', label: 'Interviews', icon: CalendarCheck, badge: 'interviews' },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/filtered', label: 'Filtered', icon: Filter, badge: 'filtered' },
+  { href: '/filtered', label: 'Excluded', icon: Filter, badge: 'filtered' },
 ];
 
 export function AppSidebar({ collapsed }: { collapsed: boolean }) {

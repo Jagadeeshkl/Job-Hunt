@@ -7,12 +7,12 @@
     "github": "https://github.com/k-l-jagadeesh",
     "location": "Chennai, Tamil Nadu, India"
   },
-  "summary": "Data-driven AI/ML professional with a B.Tech in Artificial Intelligence and Data Science and 1.3+ years of experience at Cognizant as a Workday Extend Consultant. Skilled in Python, TensorFlow, LLMs, NLP, and end-to-end ML pipelines. Proven track record building production ML systems (90% accuracy medical chatbot, 86% accuracy stock predictor) and enterprise-grade Workday applications. Seeking AI/ML engineering roles in Chennai or Bangalore.",
+  "summary": "Data-driven AI/ML professional with a B.Tech in Artificial Intelligence and Data Science and 1.6+ years of experience at Cognizant as a Workday Extend Consultant. Skilled in Python, TensorFlow, LLMs, NLP, and end-to-end ML pipelines. Proven track record building production ML systems (90% accuracy medical chatbot, 86% accuracy stock predictor) and enterprise-grade Workday applications. Seeking AI/ML engineering roles in Chennai or Bangalore.",
   "experience": [
     {
       "company": "Cognizant Technology Solutions",
       "role": "Workday Extend Consultant",
-      "duration": "Dec 2024 – Present",
+      "duration": "Jan 2024 – Present",
       "bullets": [
         "Designed and deployed multiple custom enterprise applications on Workday Extend including UNUM Application, Employee Relations Manager, and Emergency Crisis Manager used by thousands of employees.",
         "Built secure REST integrations and event-driven orchestration workflows connecting Workday Core HCM with custom Extend applications.",
@@ -43,7 +43,8 @@
       "degree": "B.Tech Artificial Intelligence and Data Science",
       "institution": "Panimalar Institute of Technology",
       "year": "2024",
-      "grade": "CGPA 8.5"
+      "duration": "Aug 2020 – Jun 2024",
+      "grade": "CGPA 8.6"
     }
   ],
   "projects": [
@@ -64,9 +65,12 @@
     }
   ],
   "certifications": [
+    "Generative AI — LLM Foundations — Google Cloud",
     "Workday Pro Integrations (Certified)",
     "Workday Integration Orchestration (Certified)",
     "Specialization in Machine Learning — deeplearning.ai (Ongoing)",
     "Mathematics for Machine Learning — deeplearning.ai (Ongoing)"
-  ]
+  ],
+  "strengths": ["Problem Solving", "Analytical Thinking", "Time Management", "Communication"],
+  "spoken_languages": ["English", "Tamil"]
 }

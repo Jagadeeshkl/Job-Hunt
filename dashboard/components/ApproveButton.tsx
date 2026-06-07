@@ -16,37 +16,23 @@ export function ApproveButton({ applicationId, onStatusChange }: ApproveButtonPr
     setError(null);
 
     try {
-      const approveRes = await fetch('/api/approve', {
+      // The route generates + uploads both PDFs and only then responds, so the
+      // URLs are available directly — no polling needed.
+      const res = await fetch('/api/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: applicationId }),
       });
+      const data = await res.json();
 
-      if (!approveRes.ok) throw new Error('Approval request failed');
+      if (!res.ok || !data.ok) {
+        throw new Error(data?.error || 'Approval request failed');
+      }
 
-      // Poll until status changes to 'approved'
-      let attempts = 0;
-      const poll = setInterval(async () => {
-        attempts++;
-        if (attempts > 60) {
-          clearInterval(poll);
-          setError('Timed out waiting for generation');
-          setLoading(false);
-          return;
-        }
-
-        const res = await fetch(`/api/applications?id=${applicationId}`);
-        const data = await res.json();
-        const app = data?.application;
-
-        if (app?.status === 'approved') {
-          clearInterval(poll);
-          setLoading(false);
-          onStatusChange(applicationId, 'approved', app.resume_storage_url, app.cover_letter_storage_url);
-        }
-      }, 5000);
+      setLoading(false);
+      onStatusChange(applicationId, 'approved', data.resume_storage_url, data.cover_letter_storage_url);
     } catch (err) {
-      setError(String(err));
+      setError(err instanceof Error ? err.message : String(err));
       setLoading(false);
     }
   }

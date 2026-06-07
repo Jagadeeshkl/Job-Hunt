@@ -3,9 +3,14 @@ import path from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { buildMatchingPrompt } from './prompts';
 import { generateWithRetry } from '../lib/gemini';
+import { gateReason } from '../scraper/quality-gate';
 import baseResume from '../resume-generator/base-resume.json';
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
+
+const WEIGHTS: Record<string, number> = { stack_fit: 0.30, evidence: 0.20, seniority: 0.20, mission: 0.15, location: 0.10, compensation: 0.05 };
+const DIMS = ['stack_fit', 'seniority', 'location', 'compensation', 'evidence', 'mission'];
+const clamp = (n: any) => { n = Number(n); return isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : 0; };
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -14,11 +19,11 @@ const supabase = createClient(
 
 interface MatchResult {
   match_score: number;
+  score_breakdown: Record<string, { score: number; reason: string }>;
   matched_skills: string[];
   missing_skills: string[];
   match_justification: string;
-  ats_keywords_to_add: string[];
-  recommended_role_title: string;
+  status: 'matched' | 'filtered';
 }
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -29,7 +34,26 @@ async function matchJob(jdText: string): Promise<MatchResult | null> {
     const text = await generateWithRetry(prompt, { tag: 'matcher' });
 
     const json = text.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
-    return JSON.parse(json) as MatchResult;
+    const p = JSON.parse(json);
+    const d = p.dimensions || {};
+    const breakdown: Record<string, { score: number; reason: string }> = {};
+    let overall = 0;
+    for (const k of DIMS) {
+      const score = clamp(d[k] && d[k].score);
+      breakdown[k] = { score, reason: (d[k] && typeof d[k].reason === 'string') ? d[k].reason : '' };
+      overall += (WEIGHTS[k] || 0) * score;
+    }
+    overall = Math.round(overall);
+    const matched = overall >= 60;
+    const justification = DIMS.map(k => ({ k, r: breakdown[k].reason })).filter(x => x.r).map(x => `${x.k.replace('_', ' ')}: ${x.r}`).join('\n');
+    return {
+      match_score: overall,
+      score_breakdown: breakdown,
+      matched_skills: p.matched_skills || [],
+      missing_skills: p.missing_skills || [],
+      match_justification: matched ? justification : `Below threshold (${overall})`,
+      status: matched ? 'matched' : 'filtered',
+    };
   } catch (err: any) {
     console.error('[matcher] Gemini error:', err?.message || err);
     return null;
@@ -63,6 +87,16 @@ async function main() {
       continue;
     }
 
+    // Deterministic quality gate — drop senior/thin/spam before Gemini.
+    const reason = gateReason(job.role, job.jd_text);
+    if (reason) {
+      await supabase.from('applications')
+        .update({ status: 'filtered', match_justification: `Filtered: ${reason}` })
+        .eq('id', job.id);
+      console.log(`[matcher] gated ${job.company}: ${reason}`);
+      continue;
+    }
+
     const result = await matchJob(job.jd_text);
     if (!result) {
       consecutiveFailures++;
@@ -83,10 +117,11 @@ async function main() {
       .from('applications')
       .update({
         match_score: result.match_score,
+        score_breakdown: result.score_breakdown,
         matched_skills: result.matched_skills,
         missing_skills: result.missing_skills,
         match_justification: result.match_justification,
-        status: 'matched',
+        status: result.status,
       })
       .eq('id', job.id);
 

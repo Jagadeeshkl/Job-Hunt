@@ -25,6 +25,15 @@ function todayLong(): string {
   return new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+// Keep the headline simple and AI/ML-focused: no years-of-experience, seniority,
+// or "production" wording (per the user's locked preference). If Gemini slips any
+// of that in, fall back to a clean default.
+function cleanHeadline(h?: string): string {
+  const t = (h || '').trim();
+  if (!t || /year|experience|production|senior|junior|\d/i.test(t)) return 'AI/ML Engineer';
+  return t;
+}
+
 const SYSTEM =
   'You are an expert technical resume writer and career coach for AI/ML roles. ' +
   'You tailor an existing resume to a specific job WITHOUT inventing any facts, ' +
@@ -46,7 +55,7 @@ ${(job.jdText || '').slice(0, 6000)}
 
 Return ONLY valid JSON (no markdown) in exactly this shape:
 {
-  "headline": "<short professional headline under the name, aligned to the role, e.g. 'Machine Learning Engineer — AI & Data Science Graduate'>",
+  "headline": "<short, simple AI/ML role title under the name. MUST be centred on AI/ML (e.g. 'AI/ML Engineer', 'Machine Learning Engineer', 'AI/ML Engineer — Data Science'). Do NOT mention years of experience, seniority words, or the word 'production'. Keep it to a few words.>",
   "summary": "<3-4 sentence profile summary, reframed for this role, using ONLY existing facts>",
   "project_order": [<the project names from this list, most-relevant first: ${JSON.stringify(projectNames)}>],
   "cover_letter_paragraphs": [
@@ -75,7 +84,7 @@ export async function tailorForJob(
     console.warn('[tailor] Gemini tailoring failed, using fallback:', (err as Error).message);
   }
 
-  const headline = parsed?.headline?.trim() || `${job.role} — AI & Data Science`;
+  const headline = cleanHeadline(parsed?.headline);
   const summary = parsed?.summary?.trim() || base.summary;
   const projectOrder = parsed?.project_order?.length ? parsed.project_order : undefined;
 

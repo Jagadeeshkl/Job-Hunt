@@ -1,0 +1,11 @@
+node_modules
+**/node_modules
+.next
+dashboard/.next
+.git
+.env*
+**/.env*
+npm-debug.log*
+.DS_Store
+*.md
+docs

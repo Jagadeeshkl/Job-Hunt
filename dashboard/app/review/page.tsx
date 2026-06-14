@@ -9,7 +9,6 @@ import { cn, parseJustification } from '../../lib/utils';
 import { MatchBadge } from '../../components/MatchBadge';
 import { emitSavedToast, emitNotifyRefresh } from '../../lib/events';
 import { DIMENSIONS, scoreColor, type ScoreBreakdown } from '../../lib/score';
-import { generateAndSaveDocs } from '../../lib/generate-docs';
 
 interface ReviewJob {
   id: string;
@@ -109,8 +108,11 @@ export default function ReviewPage() {
     }
     setBusy(true); setError(null);
     try {
-      // Tailor on the server, render the PDFs in the browser, upload via server.
-      await generateAndSaveDocs(current.id);
+      const res = await fetch('/api/approve', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: current.id }),
+      });
+      if (!res.ok) throw new Error('Approve request failed');
       advance();
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
     finally { setBusy(false); }

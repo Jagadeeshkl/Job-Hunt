@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { generateAndSaveDocs } from '../lib/generate-docs';
 
 interface ApproveButtonProps {
   applicationId: string;
@@ -17,12 +16,20 @@ export function ApproveButton({ applicationId, onStatusChange }: ApproveButtonPr
     setError(null);
 
     try {
-      // Tailor on the server, render the PDFs in the browser, upload via server.
-      const { resume_storage_url, cover_letter_storage_url } =
-        await generateAndSaveDocs(applicationId);
+      // The route tailors, renders both PDFs (server-side Chromium), uploads them,
+      // and returns the URLs — no polling needed.
+      const res = await fetch('/api/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: applicationId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data?.error || 'Approval request failed');
+      }
 
       setLoading(false);
-      onStatusChange(applicationId, 'approved', resume_storage_url, cover_letter_storage_url);
+      onStatusChange(applicationId, 'approved', data.resume_storage_url, data.cover_letter_storage_url);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setLoading(false);

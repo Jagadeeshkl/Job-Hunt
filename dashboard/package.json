@@ -2,6 +2,9 @@
   "name": "job-agent-dashboard",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,7 +13,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@sparticuz/chromium-min": "131.0.0",
+    "@sparticuz/chromium": "^131.0.0",
     "@supabase/supabase-js": "^2.45.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.17.0",

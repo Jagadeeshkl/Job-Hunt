@@ -96,6 +96,22 @@ export function ApplicationTable({ applications, onStatusChange }: Props) {
     }
   }
 
+  // "Remove" (Applications): you don't want this job → dismiss it. Drops the row
+  // here and from every default view (same as Excluded → Remove).
+  async function dismiss(id: string) {
+    setAppList(prev => prev.filter(a => a.id !== id));
+    try {
+      await fetch(`/api/applications/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'dismissed' }),
+      });
+      onStatusChange?.(id, 'dismissed');
+    } catch {
+      /* optimistic — a refresh will reconcile */
+    }
+  }
+
   // "Revert" (Dashboard): undo an applied job → back to the Applications page.
   // Returns to 'approved' if docs were generated, else 'matched'.
   async function revertApplied(id: string) {
@@ -129,7 +145,7 @@ export function ApplicationTable({ applications, onStatusChange }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40">
-              {['Company', 'Role', 'Score', 'Why', 'Missing Skills', 'Status', 'Applied', 'Action'].map(h => (
+              {['Company', 'Role', 'Score', 'Why', 'Missing Skills', 'Status', 'Applied', 'Links', 'Actions'].map(h => (
                 <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {h}
                 </th>
@@ -173,48 +189,66 @@ export function ApplicationTable({ applications, onStatusChange }: Props) {
                   <td className="px-4 py-3 text-xs text-muted-foreground">
                     {app.applied_at ? new Date(app.applied_at).toLocaleDateString() : '—'}
                   </td>
+                  {/* Links — JD / generated documents (anchors only) */}
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
+                      {app.status === 'approved' && app.resume_storage_url && (
+                        <a href={app.resume_storage_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Resume</a>
+                      )}
+                      {app.status === 'approved' && app.cover_letter_storage_url && (
+                        <a href={app.cover_letter_storage_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Cover</a>
+                      )}
+                      {(app.status === 'matched' && app.is_manual_required) || app.status === 'approved' ? (
+                        <a href={app.jd_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground">Apply <ExternalLink className="h-3 w-3" /></a>
+                      ) : (
+                        <a href={app.jd_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground">View JD <ExternalLink className="h-3 w-3" /></a>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* Actions — buttons that change state */}
                   <td className="px-4 py-3">
                     {/* matched (auto ATS) → generate resume + cover */}
                     {app.status === 'matched' && !app.is_manual_required && (
-                      <ApproveButton applicationId={app.id} onStatusChange={handleStatusChange} />
+                      <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
+                        <ApproveButton applicationId={app.id} onStatusChange={handleStatusChange} />
+                        <button onClick={() => dismiss(app.id)} className="pill bg-danger/10 text-danger transition-colors hover:bg-danger/20">Remove</button>
+                      </div>
                     )}
 
                     {/* matched (manual) → apply externally, then mark applied */}
                     {app.status === 'matched' && app.is_manual_required && (
                       <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
                         <span className="pill bg-accent/15 text-accent">Manual</span>
-                        <a href={app.jd_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground">Apply <ExternalLink className="h-3 w-3" /></a>
                         <button onClick={() => markApplied(app.id)} className="pill bg-success/10 text-success transition-colors hover:bg-success/20">Mark applied</button>
+                        <button onClick={() => dismiss(app.id)} className="pill bg-danger/10 text-danger transition-colors hover:bg-danger/20">Remove</button>
                       </div>
                     )}
 
-                    {/* approved (docs ready) → links + apply + mark applied */}
+                    {/* approved (docs ready) → mark applied + remove */}
                     {app.status === 'approved' && (
                       <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
-                        {app.resume_storage_url && <a href={app.resume_storage_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Resume</a>}
-                        {app.cover_letter_storage_url && <a href={app.cover_letter_storage_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Cover</a>}
-                        <a href={app.jd_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground">Apply <ExternalLink className="h-3 w-3" /></a>
                         <button onClick={() => markApplied(app.id)} className="pill bg-success/10 text-success transition-colors hover:bg-success/20">Mark applied</button>
+                        <button onClick={() => dismiss(app.id)} className="pill bg-danger/10 text-danger transition-colors hover:bg-danger/20">Remove</button>
                       </div>
                     )}
 
-                    {/* applied → view JD + revert back to Applications */}
+                    {/* applied → revert back to Applications */}
                     {app.status === 'applied' && (
                       <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
-                        <a href={app.jd_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground">View JD <ExternalLink className="h-3 w-3" /></a>
                         <button onClick={() => revertApplied(app.id)} className="pill bg-muted text-muted-foreground transition-colors hover:bg-muted/70">Revert</button>
                       </div>
                     )}
 
-                    {/* downstream stages → view JD */}
+                    {/* downstream stages → no actions */}
                     {['interview_scheduled', 'assessment', 'offer'].includes(app.status) && (
-                      <a href={app.jd_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">View JD <ExternalLink className="h-3 w-3" /></a>
+                      <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </td>
                 </tr>
                 {expanded === app.id && app.match_justification && (
                   <tr className="bg-muted/30">
-                    <td colSpan={8} className="px-6 py-3">
+                    <td colSpan={9} className="px-6 py-3">
                       <ul className="space-y-1.5">
                         {parseJustification(app.match_justification).map((point, i) => (
                           <li key={i} className="flex gap-2 text-xs leading-relaxed text-muted-foreground">

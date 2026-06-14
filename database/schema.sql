@@ -2,9 +2,14 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Application status pipeline
+-- 'dismissed' (user not interested; migration 001) and 'filtered' (quality-gate /
+-- sub-threshold; migration 002) are part of the live pipeline and are referenced
+-- directly in SQL (see dashboard/app/api/applications/route.ts), so they must
+-- exist in a fresh install too.
 CREATE TYPE application_status AS ENUM (
   'scraped', 'matched', 'approved', 'applied',
-  'interview_scheduled', 'assessment', 'rejected', 'offer'
+  'interview_scheduled', 'assessment', 'rejected', 'offer',
+  'dismissed', 'filtered'
 );
 
 -- Email classification
@@ -33,9 +38,11 @@ CREATE TABLE applications (
     missing_skills TEXT[],
     matched_skills TEXT[],
     status application_status DEFAULT 'scraped',
+    score_breakdown JSONB,                       -- 6-dimension rubric (migration 002)
     resume_storage_url TEXT,
     cover_letter_storage_url TEXT,
     is_manual_required BOOLEAN DEFAULT FALSE,
+    starred BOOLEAN NOT NULL DEFAULT FALSE,      -- review-queue shortlist (migration 001)
     applied_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -67,6 +74,7 @@ CREATE TRIGGER update_applications_updated_at
 CREATE INDEX idx_applications_status ON applications(status);
 CREATE INDEX idx_applications_match_score ON applications(match_score DESC);
 CREATE INDEX idx_applications_created_at ON applications(created_at DESC);
+CREATE INDEX idx_applications_starred ON applications(starred) WHERE starred = true;  -- review-queue shortlist (migration 001)
 CREATE INDEX idx_communication_logs_application_id ON communication_logs(application_id);
 
 -- Companies to scrape

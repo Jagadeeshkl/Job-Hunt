@@ -50,7 +50,9 @@ export async function renderPdfs(htmls: string[]): Promise<Buffer[]> {
     const out: Buffer[] = [];
     for (const html of htmls) {
       const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle0' });
+      // 'load' (not 'networkidle0') — the template has no external resources, and
+      // networkidle0 hangs on Chrome's background favicon request (→ 30s timeout).
+      await page.setContent(html, { waitUntil: 'load', timeout: 60000 });
       const pdf = await page.pdf({
         printBackground: true,    // keep the blue/white colours
         preferCSSPageSize: true,  // honour the template's @page A4 size/margins

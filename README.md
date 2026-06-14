@@ -21,7 +21,10 @@ Autonomous job application system. Scrapes AI/ML job listings from Greenhouse, L
 3. **Review** (`/review`) / **Applications** (`/applications`): for a **matched**
    job → **Generate docs** → Gemini tailors a resume + cover letter (locked
    blue/white template → PDF → Supabase Storage) → status **approved**. The Review
-   card shows the 6-dimension breakdown bars.
+   card shows the 6-dimension breakdown bars. The Applications table splits each
+   row into a **Links** column (Resume/Cover/Apply/View JD) and an **Actions**
+   column (Generate docs/Mark applied/Revert/**Remove**); **Remove** dismisses a
+   job you don't want.
 4. **Apply manually** (open the JD) → **Mark applied** → status **applied**; the
    job moves to the **Dashboard** and leaves Applications.
 5. **Dashboard** (`/`) = your **applied** jobs (Company · Role · Date · JD link ·
@@ -134,8 +137,12 @@ node scripts/agent-server.js   # listens on :3002
 
 ```bash
 bash scripts/test-all-agents.sh
-cd dashboard && pnpm dev        # http://localhost:3000
+cd dashboard && npm install && npm run dev   # http://localhost:3000
 ```
+
+> The dashboard has its own deps — run `npm install` in `dashboard/` once
+> (`pnpm` works too if installed). On Windows, launch from a shell that has
+> Node on PATH (PowerShell), not Git-Bash.
 
 ## Running Agents Manually
 
@@ -167,7 +174,9 @@ scraped → matched → approved → applied → interview_scheduled → assessm
 | `approved` | dashboard **Generate docs** (resume + cover generated) |
 | `applied` | dashboard **Mark applied** (you applied manually) |
 | `interview_scheduled` / `assessment` / `rejected` / `offer` | email-monitor (or manual on the Interviews board) |
-| `dismissed` | Review **Reject** or Excluded **Remove** |
+| `dismissed` | Review **Reject**, Excluded **Remove**, or Applications **Remove** |
+
+`status` is `NOT NULL DEFAULT 'scraped'`. The schema (`database/schema.sql`) is kept in sync with production (enum includes `dismissed`/`filtered`; `starred` + `score_breakdown` columns present); incremental migrations for deployed DBs live in `database/migrations/` (001–003). The dashboard list API excludes `dismissed`/`filtered` in SQL before its 200-row cap, so applied/matched jobs are never crowded out by filtered rows.
 
 `match_score` is the weighted average of the 6 rubric dimensions, stored alongside the JSONB `score_breakdown` column. Jobs with `is_manual_required = true` (Workday, custom portals) are applied externally, then marked applied.
 

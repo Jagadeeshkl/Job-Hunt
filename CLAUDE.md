@@ -78,7 +78,14 @@ scraped → matched → approved → applied → interview_scheduled → assessm
 - `filtered` — set by WF01 Quality Gate (senior-title / **>5y experience** / thin /
   off-target) OR by a rubric score `<60`. Never (re)scored; hidden from default
   views; browsable on the dashboard **Excluded** page (Restore / Remove).
-- `dismissed` — Review "Reject" or Excluded "Remove".
+- `dismissed` — Review "Reject", Excluded "Remove", or Applications "Remove".
+
+DB note: `database/schema.sql` is kept in sync with production — it includes the
+`dismissed`/`filtered` enum values, the `starred` + `score_breakdown` columns, and
+`status` is `NOT NULL DEFAULT 'scraped'`. Incremental changes for already-deployed
+DBs live in `database/migrations/` (001 review queue, 002 rubric+filtered, 003
+status NOT NULL — all applied to prod). The applications API references the
+`dismissed`/`filtered` labels in SQL, so those enum values MUST exist before it runs.
 
 ## Current dashboard flow (live — human-in-the-loop, manual apply)
 1. WF01 (n8n Cloud cron, **Mon/Wed/Fri 08:00 IST**; scoring runs from the trigger, independent of the scrape loop): scrape → **Quality Gate** (drop senior/>5y/thin/off-target
@@ -91,10 +98,16 @@ scraped → matched → approved → applied → interview_scheduled → assessm
 3. **Applications** page (full filterable list, hides applied+ by default) → matched
    job → **Generate docs** (`/api/approve`: Gemini-tailored resume+cover in the
    locked blue/white template, HTML→PDF via headless Edge, uploaded to Supabase
-   Storage) → `approved`.
+   Storage) → `approved`. Each row has two columns: **Links** (Resume/Cover/Apply/
+   View JD anchors) and **Actions** (Generate docs/Mark applied/Revert/**Remove**).
+   **Remove** sets `dismissed` (same as Excluded→Remove). Shared component:
+   `components/ApplicationTable.tsx` (used by Applications + Dashboard); pill
+   buttons come from `components/PillButton.tsx`.
 4. **Mark applied** (after applying manually) → `applied`, moves to **Dashboard**.
 5. **Dashboard** (`/`) = applied jobs only (Company/Role/Date/JD link/Status) +
-   stats/charts/activity; **Revert** sends one back to Applications.
+   stats/charts/activity; **Revert** sends one back to Applications. NOTE: the
+   list API (`/api/applications`) excludes `dismissed`/`filtered` **in SQL before**
+   its 200-row cap, so applied/matched jobs are never dropped by filtered noise.
 6. **Excluded** (`/filtered`), **Saved** (`/saved`) + notifications bell, Review
    queue (Approve/Skip/Reject/Save). base-resume.json is the single source of truth
    for BOTH the matcher profile and the generated documents.

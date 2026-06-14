@@ -43,15 +43,21 @@ async function findLocalBrowser(): Promise<string | null> {
   return null;
 }
 
+// Complete Chromium pack (binary + shared libraries) matching @sparticuz/chromium-min
+// 131.0.0. Downloaded to /tmp at runtime so the libs (libnss3, etc.) are always
+// present — avoids Next file-tracing dropping them from the function bundle.
+const CHROMIUM_PACK_URL =
+  'https://github.com/Sparticuz/chromium/releases/download/v131.0.0/chromium-v131.0.0-pack.tar';
+
 // --- Serverless backend (Vercel / AWS Lambda) ----------------------------------
 async function renderWithServerlessChromium(html: string): Promise<Buffer> {
-  const chromium = (await import('@sparticuz/chromium')).default;
+  const chromium = (await import('@sparticuz/chromium-min')).default;
   const puppeteer = (await import('puppeteer-core')).default;
 
   const browser = await puppeteer.launch({
     args: chromium.args,
     defaultViewport: chromium.defaultViewport,
-    executablePath: await chromium.executablePath(),
+    executablePath: await chromium.executablePath(CHROMIUM_PACK_URL),
     headless: chromium.headless,
   });
 

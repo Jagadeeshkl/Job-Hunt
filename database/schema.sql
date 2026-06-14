@@ -37,7 +37,7 @@ CREATE TABLE applications (
     match_justification TEXT,
     missing_skills TEXT[],
     matched_skills TEXT[],
-    status application_status DEFAULT 'scraped',
+    status application_status NOT NULL DEFAULT 'scraped',
     score_breakdown JSONB,                       -- 6-dimension rubric (migration 002)
     resume_storage_url TEXT,
     cover_letter_storage_url TEXT,

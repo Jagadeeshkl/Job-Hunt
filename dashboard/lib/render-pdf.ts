@@ -1,7 +1,11 @@
-// Renders an HTML string to a PDF Buffer using a headless Chromium/Edge browser.
-// Used by the Approve flow to produce the locked resume/cover-letter look. Runs
-// server-side only (spawns a local browser), so the dashboard must run on a
-// machine that has Edge or Chrome installed.
+// Renders an HTML string to a PDF Buffer.
+//
+// Two backends, picked automatically:
+//   • Serverless (Vercel / Linux): puppeteer-core + @sparticuz/chromium — a
+//     Chromium build that runs inside a serverless function. Used in production.
+//   • Local dev (Windows/Mac with Edge or Chrome installed): drives the installed
+//     browser via `--print-to-pdf`. Keeps `npm run dev` working with zero extra
+//     downloads. Set CHROME_PATH in .env.local to override the browser location.
 
 import { execFile } from 'child_process';
 import { promises as fs } from 'fs';
@@ -12,19 +16,22 @@ import { promisify } from 'util';
 
 const execFileAsync = promisify(execFile);
 
-const CANDIDATES = [
+// Locally-installed browsers to try (dev only).
+const LOCAL_CANDIDATES = [
   process.env.CHROME_PATH,
   'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
   'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
   'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
 ].filter(Boolean) as string[];
 
 let cachedBrowser: string | null = null;
 
-async function findBrowser(): Promise<string> {
+async function findLocalBrowser(): Promise<string | null> {
   if (cachedBrowser) return cachedBrowser;
-  for (const p of CANDIDATES) {
+  for (const p of LOCAL_CANDIDATES) {
     try {
       await fs.access(p);
       cachedBrowser = p;
@@ -33,11 +40,37 @@ async function findBrowser(): Promise<string> {
       /* keep looking */
     }
   }
-  throw new Error('No Edge/Chrome found for PDF rendering. Set CHROME_PATH in .env.local.');
+  return null;
 }
 
-export async function htmlToPdf(html: string): Promise<Buffer> {
-  const browser = await findBrowser();
+// --- Serverless backend (Vercel / AWS Lambda) ----------------------------------
+async function renderWithServerlessChromium(html: string): Promise<Buffer> {
+  const chromium = (await import('@sparticuz/chromium')).default;
+  const puppeteer = (await import('puppeteer-core')).default;
+
+  const browser = await puppeteer.launch({
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
+  });
+
+  try {
+    const page = await browser.newPage();
+    // Load the HTML and wait for fonts/styles before printing.
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const pdf = await page.pdf({
+      printBackground: true,      // keep the blue/white colours
+      preferCSSPageSize: true,    // honour the template's @page size/margins
+    });
+    return Buffer.from(pdf);
+  } finally {
+    await browser.close();
+  }
+}
+
+// --- Local backend (installed Edge/Chrome via --print-to-pdf) -------------------
+async function renderWithLocalBrowser(browser: string, html: string): Promise<Buffer> {
   const id = randomUUID();
   const tmp = os.tmpdir();
   const htmlPath = path.join(tmp, `doc-${id}.html`);
@@ -69,4 +102,15 @@ export async function htmlToPdf(html: string): Promise<Buffer> {
     fs.rm(pdfPath, { force: true }).catch(() => {});
     fs.rm(userDataDir, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+export async function htmlToPdf(html: string): Promise<Buffer> {
+  // On Vercel always use the bundled serverless Chromium. Locally, prefer an
+  // installed Edge/Chrome (no downloads needed); fall back to serverless Chromium
+  // if none is found.
+  if (!process.env.VERCEL) {
+    const local = await findLocalBrowser();
+    if (local) return renderWithLocalBrowser(local, html);
+  }
+  return renderWithServerlessChromium(html);
 }

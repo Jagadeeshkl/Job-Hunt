@@ -1,11 +1,16 @@
-// Renders an HTML string to a PDF Buffer.
+// Renders HTML strings to PDF Buffers.
 //
 // Two backends, picked automatically:
-//   • Serverless (Vercel / Linux): puppeteer-core + @sparticuz/chromium — a
-//     Chromium build that runs inside a serverless function. Used in production.
+//   • Serverless (Vercel / Linux): puppeteer-core + @sparticuz/chromium-min,
+//     which downloads a complete Chromium pack (binary + shared libs) to /tmp at
+//     runtime. Used in production.
 //   • Local dev (Windows/Mac with Edge or Chrome installed): drives the installed
 //     browser via `--print-to-pdf`. Keeps `npm run dev` working with zero extra
 //     downloads. Set CHROME_PATH in .env.local to override the browser location.
+//
+// IMPORTANT: render multiple documents through ONE browser (renderPdfs), never by
+// launching Chromium concurrently — two simultaneous launches race on the same
+// /tmp binary and throw `spawn ETXTBSY` / can crash the function.
 
 import { execFile } from 'child_process';
 import { promises as fs } from 'fs';
@@ -43,14 +48,15 @@ async function findLocalBrowser(): Promise<string | null> {
   return null;
 }
 
-// Complete Chromium pack (binary + shared libraries) matching @sparticuz/chromium-min
-// 131.0.0. Downloaded to /tmp at runtime so the libs (libnss3, etc.) are always
-// present — avoids Next file-tracing dropping them from the function bundle.
+// Complete Chromium pack (binary + shared libraries) matching
+// @sparticuz/chromium-min 131.0.0. Downloaded to /tmp at runtime so the libs
+// (libnss3, etc.) are always present — avoids Next file-tracing dropping them.
 const CHROMIUM_PACK_URL =
   'https://github.com/Sparticuz/chromium/releases/download/v131.0.0/chromium-v131.0.0-pack.tar';
 
 // --- Serverless backend (Vercel / AWS Lambda) ----------------------------------
-async function renderWithServerlessChromium(html: string): Promise<Buffer> {
+// One browser, rendered sequentially → no concurrent /tmp binary race.
+async function renderWithServerlessChromium(htmls: string[]): Promise<Buffer[]> {
   const chromium = (await import('@sparticuz/chromium-min')).default;
   const puppeteer = (await import('puppeteer-core')).default;
 
@@ -82,14 +88,18 @@ async function renderWithServerlessChromium(html: string): Promise<Buffer> {
   if (!browser) throw lastErr;
 
   try {
-    const page = await browser.newPage();
-    // Load the HTML and wait for fonts/styles before printing.
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    const pdf = await page.pdf({
-      printBackground: true,      // keep the blue/white colours
-      preferCSSPageSize: true,    // honour the template's @page size/margins
-    });
-    return Buffer.from(pdf);
+    const out: Buffer[] = [];
+    for (const html of htmls) {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+      const pdf = await page.pdf({
+        printBackground: true,      // keep the blue/white colours
+        preferCSSPageSize: true,    // honour the template's @page size/margins
+      });
+      await page.close();
+      out.push(Buffer.from(pdf));
+    }
+    return out;
   } finally {
     await browser.close();
   }
@@ -130,13 +140,20 @@ async function renderWithLocalBrowser(browser: string, html: string): Promise<Bu
   }
 }
 
-export async function htmlToPdf(html: string): Promise<Buffer> {
-  // On Vercel always use the bundled serverless Chromium. Locally, prefer an
-  // installed Edge/Chrome (no downloads needed); fall back to serverless Chromium
-  // if none is found.
+// Render several HTML documents to PDFs. Use this (not parallel htmlToPdf calls)
+// when producing more than one document so Chromium is launched only once.
+export async function renderPdfs(htmls: string[]): Promise<Buffer[]> {
   if (!process.env.VERCEL) {
     const local = await findLocalBrowser();
-    if (local) return renderWithLocalBrowser(local, html);
+    if (local) {
+      const out: Buffer[] = [];
+      for (const html of htmls) out.push(await renderWithLocalBrowser(local, html)); // sequential
+      return out;
+    }
   }
-  return renderWithServerlessChromium(html);
+  return renderWithServerlessChromium(htmls);
+}
+
+export async function htmlToPdf(html: string): Promise<Buffer> {
+  return (await renderPdfs([html]))[0];
 }

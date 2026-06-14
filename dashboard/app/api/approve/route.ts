@@ -4,7 +4,7 @@ import { loadBaseResume } from '../../../lib/base-resume';
 import { tailorForJob } from '../../../lib/tailor';
 import { renderResumeHTML } from '../../../lib/resume-template';
 import { renderCoverLetterHTML } from '../../../lib/cover-letter-template';
-import { htmlToPdf } from '../../../lib/render-pdf';
+import { renderPdfs } from '../../../lib/render-pdf';
 import { uploadPdf } from '../../../lib/storage';
 
 // Needs the Node runtime: spawns a headless browser and uses fs.
@@ -50,10 +50,8 @@ export async function POST(req: NextRequest) {
     const resumeHtml = renderResumeHTML(base, resume);
     const coverHtml = renderCoverLetterHTML(base, cover);
 
-    const [resumePdf, coverPdf] = await Promise.all([
-      htmlToPdf(resumeHtml),
-      htmlToPdf(coverHtml),
-    ]);
+    // One Chromium launch for both docs — never two concurrent launches.
+    const [resumePdf, coverPdf] = await renderPdfs([resumeHtml, coverHtml]);
 
     // 4) Upload to Supabase Storage
     const prefix = `${slug(app.company)}-${app.role ? slug(app.role) : 'role'}`;

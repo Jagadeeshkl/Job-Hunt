@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { ExternalLink, ChevronDown } from 'lucide-react';
 import { MatchBadge } from './MatchBadge';
 import { ApproveButton } from './ApproveButton';
+import { PillButton } from './PillButton';
 import { cn, parseJustification } from '../lib/utils';
 
 export interface Application {
@@ -79,55 +80,37 @@ export function ApplicationTable({ applications, onStatusChange }: Props) {
     onStatusChange?.(id, status, resumeUrl, coverUrl);
   }
 
-  // "Mark applied → Dashboard": you applied manually. Record it and drop the row
-  // from this table (applied jobs live on the Dashboard, not Applications).
-  async function markApplied(id: string) {
-    const applied_at = new Date().toISOString();
+  // Optimistically drop the row and PATCH its new status. Shared by every action
+  // that moves a job off this table (Mark applied / Remove / Revert).
+  async function patchAndRemove(id: string, body: Record<string, unknown>, notifyStatus: string) {
     setAppList(prev => prev.filter(a => a.id !== id));
     try {
       await fetch(`/api/applications/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'applied', applied_at }),
+        body: JSON.stringify(body),
       });
-      onStatusChange?.(id, 'applied');
+      onStatusChange?.(id, notifyStatus);
     } catch {
       /* optimistic — a refresh will reconcile */
     }
   }
+
+  // "Mark applied → Dashboard": you applied manually. Record it and drop the row
+  // from this table (applied jobs live on the Dashboard, not Applications).
+  const markApplied = (id: string) =>
+    patchAndRemove(id, { status: 'applied', applied_at: new Date().toISOString() }, 'applied');
 
   // "Remove" (Applications): you don't want this job → dismiss it. Drops the row
   // here and from every default view (same as Excluded → Remove).
-  async function dismiss(id: string) {
-    setAppList(prev => prev.filter(a => a.id !== id));
-    try {
-      await fetch(`/api/applications/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'dismissed' }),
-      });
-      onStatusChange?.(id, 'dismissed');
-    } catch {
-      /* optimistic — a refresh will reconcile */
-    }
-  }
+  const dismiss = (id: string) => patchAndRemove(id, { status: 'dismissed' }, 'dismissed');
 
   // "Revert" (Dashboard): undo an applied job → back to the Applications page.
   // Returns to 'approved' if docs were generated, else 'matched'.
-  async function revertApplied(id: string) {
+  function revertApplied(id: string) {
     const app = appList.find(a => a.id === id);
     const target = app?.resume_storage_url ? 'approved' : 'matched';
-    setAppList(prev => prev.filter(a => a.id !== id));
-    try {
-      await fetch(`/api/applications/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: target, applied_at: null }),
-      });
-      onStatusChange?.(id, target);
-    } catch {
-      /* optimistic — a refresh will reconcile */
-    }
+    return patchAndRemove(id, { status: target, applied_at: null }, target);
   }
 
   if (appList.length === 0) {
@@ -212,7 +195,7 @@ export function ApplicationTable({ applications, onStatusChange }: Props) {
                     {app.status === 'matched' && !app.is_manual_required && (
                       <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
                         <ApproveButton applicationId={app.id} onStatusChange={handleStatusChange} />
-                        <button onClick={() => dismiss(app.id)} className="pill bg-danger/10 text-danger transition-colors hover:bg-danger/20">Remove</button>
+                        <PillButton tone="danger" onClick={() => dismiss(app.id)}>Remove</PillButton>
                       </div>
                     )}
 
@@ -220,23 +203,23 @@ export function ApplicationTable({ applications, onStatusChange }: Props) {
                     {app.status === 'matched' && app.is_manual_required && (
                       <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
                         <span className="pill bg-accent/15 text-accent">Manual</span>
-                        <button onClick={() => markApplied(app.id)} className="pill bg-success/10 text-success transition-colors hover:bg-success/20">Mark applied</button>
-                        <button onClick={() => dismiss(app.id)} className="pill bg-danger/10 text-danger transition-colors hover:bg-danger/20">Remove</button>
+                        <PillButton tone="success" onClick={() => markApplied(app.id)}>Mark applied</PillButton>
+                        <PillButton tone="danger" onClick={() => dismiss(app.id)}>Remove</PillButton>
                       </div>
                     )}
 
                     {/* approved (docs ready) → mark applied + remove */}
                     {app.status === 'approved' && (
                       <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
-                        <button onClick={() => markApplied(app.id)} className="pill bg-success/10 text-success transition-colors hover:bg-success/20">Mark applied</button>
-                        <button onClick={() => dismiss(app.id)} className="pill bg-danger/10 text-danger transition-colors hover:bg-danger/20">Remove</button>
+                        <PillButton tone="success" onClick={() => markApplied(app.id)}>Mark applied</PillButton>
+                        <PillButton tone="danger" onClick={() => dismiss(app.id)}>Remove</PillButton>
                       </div>
                     )}
 
                     {/* applied → revert back to Applications */}
                     {app.status === 'applied' && (
                       <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
-                        <button onClick={() => revertApplied(app.id)} className="pill bg-muted text-muted-foreground transition-colors hover:bg-muted/70">Revert</button>
+                        <PillButton tone="muted" onClick={() => revertApplied(app.id)}>Revert</PillButton>
                       </div>
                     )}
 

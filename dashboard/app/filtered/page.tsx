@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ExternalLink, Loader2, Filter as FilterIcon } from 'lucide-react';
 import { MatchBadge } from '../../components/MatchBadge';
+import { PillButton } from '../../components/PillButton';
 
 interface FilteredJob {
   id: string;
@@ -91,8 +92,8 @@ export default function FilteredPage() {
                     <td className="max-w-sm truncate px-4 py-3 text-xs text-muted-foreground" title={j.match_justification ?? ''}>{j.match_justification ?? '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
-                        <button onClick={() => restore(j.id)} className="pill bg-primary/10 text-primary transition-colors hover:bg-primary/20">Restore</button>
-                        <button onClick={() => remove(j.id)} className="pill bg-danger/10 text-danger transition-colors hover:bg-danger/20">Remove</button>
+                        <PillButton tone="primary" onClick={() => restore(j.id)}>Restore</PillButton>
+                        <PillButton tone="danger" onClick={() => remove(j.id)}>Remove</PillButton>
                       </div>
                     </td>
                   </tr>

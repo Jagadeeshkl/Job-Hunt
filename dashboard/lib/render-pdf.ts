@@ -54,12 +54,32 @@ async function renderWithServerlessChromium(html: string): Promise<Buffer> {
   const chromium = (await import('@sparticuz/chromium-min')).default;
   const puppeteer = (await import('puppeteer-core')).default;
 
-  const browser = await puppeteer.launch({
+  const launchOptions = {
     args: chromium.args,
     defaultViewport: chromium.defaultViewport,
     executablePath: await chromium.executablePath(CHROMIUM_PACK_URL),
     headless: chromium.headless,
-  });
+  };
+
+  // The Chromium binary is unpacked to /tmp and can briefly be "busy" (its write
+  // handle not yet released) when we spawn it → `spawn ETXTBSY`. Retry a few
+  // times with a short backoff; the file settles within a few hundred ms.
+  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      browser = await puppeteer.launch(launchOptions);
+      break;
+    } catch (e) {
+      lastErr = e;
+      if (String((e as Error)?.message ?? e).includes('ETXTBSY')) {
+        await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
+        continue;
+      }
+      throw e;
+    }
+  }
+  if (!browser) throw lastErr;
 
   try {
     const page = await browser.newPage();

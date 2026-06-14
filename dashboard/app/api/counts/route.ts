@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getServiceClient } from '../../../lib/supabase';
 
+// Live data — never statically evaluated/cached at build time.
+export const dynamic = 'force-dynamic';
+
 /** Badge counts for the sidebar: review queue, manual-apply queue, active interviews. */
 export async function GET() {
   const supabase = getServiceClient();

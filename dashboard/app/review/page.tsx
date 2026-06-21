@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   X, SkipForward, Star, Check, ExternalLink, MapPin,
   Wallet, Sparkles, Inbox, Loader2,
@@ -59,6 +59,12 @@ export default function ReviewPage() {
 
   const advance = useCallback(() => setCards(prev => prev.slice(1)), []);
 
+  // Background doc-generation queue. Approve advances the card instantly, then
+  // chains the actual (slow, host-side) generation here so we never launch two
+  // Chromium instances at once on Render — and a slow/dropped response can never
+  // freeze the review queue again.
+  const genQueue = useRef<Promise<void>>(Promise.resolve());
+
   const onReject = useCallback(async () => {
     if (!current || busy) return;
     setBusy(true); setError(null);
@@ -99,24 +105,33 @@ export default function ReviewPage() {
     } finally { setBusy(false); }
   }, [current, busy, patch]);
 
-  const onApprove = useCallback(async () => {
-    if (!current || busy) return;
+  const onApprove = useCallback(() => {
+    if (!current) return;
     if (current.is_manual_required) {
       window.open(current.jd_url, '_blank', 'noopener');
       advance();
       return;
     }
-    setBusy(true); setError(null);
-    try {
-      const res = await fetch('/api/approve', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: current.id }),
-      });
-      if (!res.ok) throw new Error('Approve request failed');
-      advance();
-    } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
-    finally { setBusy(false); }
-  }, [current, busy, advance]);
+    const job = current;
+    // Optimistically move to the next job — generation happens in the background.
+    advance();
+    genQueue.current = genQueue.current.then(async () => {
+      try {
+        const res = await fetch('/api/approve', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: job.id }),
+        });
+        if (!res.ok) {
+          const msg = (await res.json().catch(() => ({}))).error;
+          throw new Error(msg || 'Approve request failed');
+        }
+      } catch (e) {
+        // On failure the job is still 'matched' in the DB → stays in Applications
+        // for a one-click retry. Surface a non-blocking note.
+        setError(`Docs for ${job.company} couldn’t be generated — ${String(e instanceof Error ? e.message : e)}. It’s still in Applications to retry.`);
+      }
+    });
+  }, [current, advance]);
 
   // Keyboard shortcuts
   useEffect(() => {

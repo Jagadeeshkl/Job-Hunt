@@ -5,8 +5,8 @@ const nextConfig: NextConfig = {
   images: {
     domains: ['www.google.com'],
   },
-  // puppeteer-core is loaded at runtime in the Node server; keep it out of the bundle.
-  serverExternalPackages: ['puppeteer-core'],
+  // puppeteer is loaded at runtime in the Node server; keep it out of the bundle.
+  serverExternalPackages: ['puppeteer'],
 };
 
 export default nextConfig;

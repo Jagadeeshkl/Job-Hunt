@@ -1,4 +1,5 @@
 # Auto-deploy the dashboard to Render on push to main.
+# (auto-deploy wiring verified 2026-07-09)
 #
 # The Render service is connected to this repo with autoDeploy=yes, BUT it was
 # created via the Render API without the GitHub App/webhook, so pushes never

@@ -26,8 +26,12 @@ Autonomous job application system. Scrapes AI/ML jobs, scores them, generates ta
 - Alerts: Telegram Bot API (free)
 - Notion: Notion API (free)
 - PDF: dashboard renders the locked HTML templates to PDF via **headless
-  Chromium (puppeteer-core)** on Render (`dashboard/lib/render-pdf.ts`), uploaded
-  to Supabase Storage. (The old pdf-lib / Edge `--print-to-pdf` approaches are
+  Chromium** on Render (`dashboard/lib/render-pdf.ts`), uploaded to Supabase
+  Storage. Uses the full **`puppeteer`** package with its OWN bundled,
+  version-matched Chromium — NOT `puppeteer-core` + apt `chromium` (Debian
+  floats that to bleeding-edge builds puppeteer can't launch; caused a
+  "Failed to launch the browser process" outage fixed 2026-07-09). Dockerfile
+  installs only Chromium's shared libs + fonts. (pdf-lib / Edge `--print-to-pdf`
   retired.)
 
 ## How agents run

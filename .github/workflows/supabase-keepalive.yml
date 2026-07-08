@@ -1,0 +1,37 @@
+# Keeps the Supabase free-tier project awake.
+#
+# Supabase pauses a free project after 7 consecutive days with no database
+# activity. This job runs every 2 days and makes one tiny read against the
+# public REST API, which resets that 7-day timer — so the dashboard never
+# shows an empty page because the DB went to sleep.
+#
+# The key below is the PUBLIC anon key (NEXT_PUBLIC_SUPABASE_ANON_KEY) — the
+# same one shipped to every browser that loads the dashboard. It is safe to
+# commit. The secret service key is NOT used here.
+#
+# Manual run: Actions tab -> "Supabase keep-alive" -> Run workflow.
+
+name: Supabase keep-alive
+
+on:
+  schedule:
+    - cron: '17 6 */2 * *' # every 2 days at 06:17 UTC
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST (resets the 7-day pause timer)
+        run: |
+          URL="https://akphenmifyihvsylntsw.supabase.co/rest/v1/applications?select=id&limit=1"
+          ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFrcGhlbm1pZnlpaHZzeWxudHN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTU5NTQsImV4cCI6MjA5NTg3MTk1NH0.R6P73ae5ZXP0-0xHIicQs6ZvYY4_yIhV-4dWRV8ww3I"
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "apikey: $ANON" \
+            -H "Authorization: Bearer $ANON" \
+            "$URL")
+          echo "Supabase responded with HTTP $code"
+          # 200 (rows) or 206/empty both mean the query reached Postgres = DB is awake.
+          if [ "$code" -ge 500 ]; then
+            echo "Supabase looks down/paused (HTTP $code)"; exit 1
+          fi

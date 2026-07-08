@@ -4,9 +4,14 @@
 Autonomous job application system. Scrapes AI/ML jobs, scores them, generates tailored resumes/cover letters, auto-applies, monitors email for responses, sends Telegram alerts, syncs to Notion.
 
 ## Tech Stack
-- Frontend: Next.js 14, Tailwind CSS, Shadcn UI → deployed on Vercel free tier
+- Frontend: Next.js 15, Tailwind CSS, Shadcn UI → deployed on **Render**
+  (free web service; needs a container host because doc generation runs headless
+  Chromium — Vercel serverless couldn't provide the shared libs). Live URL:
+  https://job-hunt-dashboard-0885.onrender.com (service srv-d8ng000k1i2s73dajttg).
 - Database: Supabase (PostgreSQL) free tier
-- Orchestration: n8n self-hosted in Docker (docker/docker-compose.yml)
+- Orchestration: **GitHub Actions** (`.github/workflows/`). The old n8n Cloud
+  workspace expired (~2026-06), so the daily pipeline was rebuilt as free
+  scheduled Actions. n8n (Cloud and the repo's Docker compose) is RETIRED.
 - AI: Google Gemini API, free tier. Primary model `gemini-2.5-flash-lite` with a
   5-model fallback chain (see agents/lib/gemini.ts) — each model name is a
   separate free daily quota bucket, giving ~80-100 free scores/day with no billing.
@@ -20,13 +25,20 @@ Autonomous job application system. Scrapes AI/ML jobs, scores them, generates ta
 - Email: Gmail API with OAuth2
 - Alerts: Telegram Bot API (free)
 - Notion: Notion API (free)
-- PDF: pdf-lib (free, zero dependency)
+- PDF: dashboard renders the locked HTML templates to PDF via **headless
+  Chromium (puppeteer-core)** on Render (`dashboard/lib/render-pdf.ts`), uploaded
+  to Supabase Storage. (The old pdf-lib / Edge `--print-to-pdf` approaches are
+  retired.)
 
 ## How agents run
-Agents are TypeScript scripts run on the HOST via `scripts/agent-server.js`
-(an HTTP server on port 3002). n8n runs in Docker and triggers agents by calling
-`http://host.docker.internal:3002/run/<agent>`. The agent server must be running
-on the host for the workflows to work. Agents read secrets from `.env.local`.
+The daily pipeline runs the TypeScript agents directly on a **GitHub Actions
+runner** — `.github/workflows/daily-pipeline.yml` does `npm install` then
+`npx ts-node agents/matcher/index.ts` (match backlog first) followed by
+`npx ts-node agents/scraper/daily-scrape.ts` (top-up scrape). Secrets come from
+GitHub Actions repository secrets (GOOGLE_API_KEY, APIFY_API_TOKEN, SUPABASE_URL,
+SUPABASE_SERVICE_KEY), NOT `.env.local`. (Locally the same agents still read
+`.env.local`.) The repo's `scripts/agent-server.js` + Docker n8n design is
+reference-only and NOT deployed.
 
 ## Environment Variables needed (.env.local — never committed)
 GOOGLE_API_KEY=            # Gemini, all AI tasks
@@ -88,17 +100,21 @@ status NOT NULL — all applied to prod). The applications API references the
 `dismissed`/`filtered` labels in SQL, so those enum values MUST exist before it runs.
 
 ## Current dashboard flow (live — human-in-the-loop, manual apply)
-1. WF01 (n8n Cloud cron, **Mon/Wed/Fri 08:00 IST**; scoring runs from the trigger, independent of the scrape loop): scrape → **Quality Gate** (drop senior/>5y/thin/off-target
-   to `filtered`) → Gemini **6-dimension rubric** (stack/seniority/location/comp/
+1. Daily pipeline (**GitHub Actions**, `.github/workflows/daily-pipeline.yml`,
+   cron `30 2 * * 1,3,5` = **Mon/Wed/Fri 08:00 IST**): runs `agents/matcher`
+   FIRST (score the unscored backlog oldest-first) then `agents/scraper/
+   daily-scrape` (top-up to backlog target 60). Matcher = **Quality Gate**
+   (`agents/scraper/quality-gate.ts`: drop senior/>5y/thin/off-target to
+   `filtered`) → Gemini **6-dimension rubric** (stack/seniority/location/comp/
    evidence/mission, 0–100 each) → `match_score` = weighted average
    (.30/.20/.20/.15/.10/.05) → ≥60 `matched`, <60 `filtered`. Stored in JSONB
-   `score_breakdown` column (migration 002) + the new `filtered` enum value.
+   `score_breakdown` column + the `filtered` enum value.
 2. Dashboard is **login-gated** (`/login`, cookie auth; creds in dashboard/.env.local:
    DASHBOARD_EMAIL/PASSWORD + AUTH_TOKEN).
 3. **Applications** page (full filterable list, hides applied+ by default) → matched
    job → **Generate docs** (`/api/approve`: Gemini-tailored resume+cover in the
-   locked blue/white template, HTML→PDF via headless Edge, uploaded to Supabase
-   Storage) → `approved`. Each row has two columns: **Links** (Resume/Cover/Apply/
+   locked blue/white template, HTML→PDF via **headless Chromium on Render**,
+   uploaded to Supabase Storage) → `approved`. Each row has two columns: **Links** (Resume/Cover/Apply/
    View JD anchors) and **Actions** (Generate docs/Mark applied/Revert/**Remove**).
    **Remove** sets `dismissed` (same as Excluded→Remove). Shared component:
    `components/ApplicationTable.tsx` (used by Applications + Dashboard); pill
@@ -126,26 +142,30 @@ status NOT NULL — all applied to prod). The applications API references the
 - Telegram: agents/telegram-bot/
 - Notion Sync: agents/notion-sync/
 
-## n8n Workflows
-5 workflow JSON files in n8n-workflows/. Workflow 01 = daily match-then-scrape
-(08:00 IST). Workflow 05 = Indeed top-up, Mon & Thu 08:30 IST (lighter cadence
-to conserve Apify credit; calls /run/indeed). The agent server exposes
-/run/indeed for both the workflow and manual triggering.
-The n8n container needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID for its Telegram
-nodes — supplied via docker/.env (gitignored). Import via scripts/import-n8n-workflows.sh
-(or the Node importer that strips read-only fields and POSTs /activate).
+## Orchestration — GitHub Actions (LIVE) — replaced n8n
+Two free scheduled Actions in `.github/workflows/`:
+- **`daily-pipeline.yml`** — the daily scrape+match. Cron `30 2 * * 1,3,5`
+  (08:00 IST Mon/Wed/Fri). Runs `agents/matcher` then `agents/scraper/
+  daily-scrape` on an ubuntu runner. `workflow_dispatch` allows manual runs from
+  the Actions tab. Reads GOOGLE_API_KEY / APIFY_API_TOKEN / SUPABASE_URL /
+  SUPABASE_SERVICE_KEY from **repo Actions secrets** (Settings → Secrets and
+  variables → Actions). Has a preflight step that fails loudly if a secret is
+  missing. Match-first order means newly scraped jobs are scored on the NEXT run.
+- **`supabase-keepalive.yml`** — pings the Supabase public REST endpoint every
+  2 days (`17 6 */2 * *`) with the PUBLIC anon key so the free-tier DB never
+  auto-pauses (it pauses after 7 days of no queries). Anon key is safe to commit;
+  no secret key is used here.
 
-### Deployment note: Docker reference vs. live cloud
-The n8n-workflows/*.json files + scripts/agent-server.js are the SELF-HOSTABLE
-Docker reference (n8n in Docker calls the host agents over http://host.docker.
-internal:3002). The LIVE deployment, however, runs on n8n Cloud
-(jagadeeshkl.app.n8n.cloud), where WF01 and WF05 are "cloud-native" rebuilds:
-the scrape/insert/score logic lives directly in Apify HTTP + Code + Supabase
-nodes instead of calling the host agents. Two correctness fixes apply to BOTH:
-- Google discovery uses maxPagesPerQuery:3 (NOT resultsPerPage — that field is
-  invalid for apify/google-search-scraper and silently caps results at ~10).
-- Supabase inserts run one row at a time via a splitInBatches(batchSize 1) loop
-  so a single duplicate jd_url skips itself instead of failing the whole batch.
-  (In the host agents this is handled by ignore-duplicate upsert on jd_url.)
-When editing live workflows, do so via the n8n MCP against the cloud instance;
-the repo JSONs are not auto-synced to cloud.
+Public repo ⇒ unlimited free Actions minutes. Edge case: GitHub disables
+scheduled Actions after 60 days of ZERO repo activity — a stray commit resets it.
+
+### Retired: n8n
+The old live orchestration was **n8n Cloud** (jagadeeshkl.app.n8n.cloud, WF01 +
+WF05). That workspace/trial EXPIRED (~2026-06), which is what silently stopped
+the daily runs (no new jobs 2026-06-14 → 2026-07-08) and let Supabase pause.
+The repo's `n8n-workflows/*.json` + `scripts/agent-server.js` (Docker design)
+and `n8n-workflows/cloud/*.json` (sanitized cloud snapshots) are now historical
+reference only — nothing runs on n8n anymore. **Indeed top-up (old WF05) is NOT
+yet ported** to Actions (it's paid Apify credit; add a separate workflow if the
+user wants it back). Correctness rules still baked into the TS agents: Supabase
+inserts use ignore-duplicate upsert on jd_url (one dup can't fail the batch).

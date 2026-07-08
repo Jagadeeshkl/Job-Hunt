@@ -4,12 +4,13 @@ Autonomous job application system. Scrapes AI/ML job listings from Greenhouse, L
 
 > **Live deployment note:** the diagram and Docker/agent instructions further down
 > are the self-hostable **reference** design. The system actually runs on
-> **n8n Cloud + Supabase + a Next.js dashboard**, and is **human-in-the-loop /
-> manual-apply**. The current end-to-end flow is below.
+> **GitHub Actions (daily cron) + Supabase + a Next.js dashboard on Render**, and
+> is **human-in-the-loop / manual-apply**. n8n is **retired** (the old n8n Cloud
+> trial expired ~2026-06). The current end-to-end flow is below.
 
 ## Current flow (live)
 
-1. **Scrape + score** (n8n Cloud **WF01**, cron **Mon/Wed/Fri 08:00 IST**): scrape Greenhouse/Lever/
+1. **Scrape + score** (**GitHub Actions** `.github/workflows/daily-pipeline.yml`, cron **Mon/Wed/Fri 08:00 IST**): scrape Greenhouse/Lever/
    Ashby + Apify Google discovery → **Quality Gate** drops senior-title,
    **>5-years-experience**, thin, and off-target jobs (`status='filtered'`, never
    sent to Gemini) → Gemini scores survivors on a **6-dimension rubric**
@@ -36,9 +37,11 @@ Autonomous job application system. Scrapes AI/ML job listings from Greenhouse, L
 7. **Saved** (`/saved`) + the notifications bell = jobs you star in Review.
 
 Resume/cover generation runs in the **dashboard** (`/api/approve`) because it
-renders HTML→PDF via a headless browser (Edge/Chrome), which n8n Cloud can't do.
-Edit live cloud workflows via the n8n MCP — the repo `n8n-workflows/*` are the
-Docker reference, not what's deployed.
+renders HTML→PDF via **headless Chromium (puppeteer-core)** — which is why the
+dashboard is hosted on **Render** (a container host) rather than Vercel
+serverless. The daily scrape+match runs on **GitHub Actions**
+(`.github/workflows/daily-pipeline.yml`) — the repo's `n8n-workflows/*` and
+Docker files are historical reference, not what's deployed.
 
 ## Architecture (Docker reference — self-host)
 
@@ -198,7 +201,7 @@ agents/
   telegram-bot/     — approval messages + templates
   notion-sync/      — status sync, interview prep, skill gap writer
 
-dashboard/          — Next.js 14 app (Vercel)
+dashboard/          — Next.js 15 app (Render; headless Chromium for PDF)
   app/api/          — /applications, /approve, /resume, /stats endpoints
   components/       — ApplicationTable, StatsCards, ApproveButton, etc.
 

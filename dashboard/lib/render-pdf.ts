@@ -43,7 +43,19 @@ export async function renderPdfs(htmls: string[]): Promise<Buffer[]> {
   const browser = await puppeteer.launch({
     executablePath,
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+    // --single-process + --no-zygote: on Render's locked-down 512MB container the
+    // zygote/sandbox path fails to launch newer Chromium ("Failed to adjust OOM
+    // score… Permission denied" → "Failed to launch the browser process!").
+    // Running one process bypasses the zygote and cuts memory. Safe here: the
+    // resume/cover templates are static HTML (no JS, no external resources).
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-gpu',
+      '--disable-dev-shm-usage',
+      '--no-zygote',
+      '--single-process',
+    ],
   });
 
   try {

@@ -1,0 +1,52 @@
+# Auto-deploy the dashboard to Render on push to main.
+#
+# The Render service is connected to this repo with autoDeploy=yes, BUT it was
+# created via the Render API without the GitHub App/webhook, so pushes never
+# actually reach Render (every deploy has been manual/api-triggered). This
+# workflow closes that gap: on a push that touches dashboard-affecting files, it
+# calls the service's Render Deploy Hook to trigger a build.
+#
+# Uses a scoped DEPLOY HOOK (deploy-only), NOT the account API key, so the secret
+# in GitHub can do nothing but trigger a deploy of this one service.
+#
+# Setup (one-time): Render dashboard -> this service -> Settings -> "Deploy Hook"
+#   -> copy the URL -> add it as repo secret RENDER_DEPLOY_HOOK
+#   (GitHub -> Settings -> Secrets and variables -> Actions).
+#
+# Manual run: Actions tab -> "Deploy to Render" -> Run workflow.
+
+name: Deploy to Render
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dashboard/**'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/render-deploy.yml'
+  workflow_dispatch: {}
+
+concurrency:
+  group: render-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::error::Missing secret RENDER_DEPLOY_HOOK. Add it in repo Settings -> Secrets and variables -> Actions (copy from Render -> service -> Settings -> Deploy Hook)."
+            exit 1
+          fi
+          code=$(curl -s -o resp.txt -w '%{http_code}' -X POST "$HOOK")
+          echo "Render deploy hook responded HTTP $code"
+          head -c 400 resp.txt || true
+          [ "$code" -ge 200 ] && [ "$code" -lt 300 ] || { echo "::error::Deploy hook call failed"; exit 1; }
+          echo "Deploy triggered — watch progress in the Render dashboard."

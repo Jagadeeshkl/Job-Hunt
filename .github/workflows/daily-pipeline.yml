@@ -1,0 +1,73 @@
+# Daily job pipeline — the free GitHub Actions replacement for n8n Cloud WF01.
+#
+# Replicates the documented daily order: MATCH the unscored backlog first
+# (oldest jobs, so nothing starves when the Gemini free-tier budget runs out),
+# THEN top-up scrape (curated list + Apify Google discovery) to refill the
+# backlog for the next run. Both steps are the same TypeScript agents that used
+# to run on the host under n8n — here they run directly on a GitHub runner.
+#
+# Schedule: 02:30 UTC = 08:00 IST, Mon/Wed/Fri (matches the old WF01 cadence),
+# shortly after Gemini's daily quota resets so each run starts near-full.
+#
+# Secrets required (Settings -> Secrets and variables -> Actions):
+#   GOOGLE_API_KEY        (Gemini)
+#   APIFY_API_TOKEN       (Apify Google Search discovery)
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_KEY
+# These are the real secret keys — they are NOT in this file, only referenced.
+#
+# Manual run: Actions tab -> "Daily job pipeline" -> Run workflow.
+
+name: Daily job pipeline
+
+on:
+  schedule:
+    - cron: '30 2 * * 1,3,5' # 08:00 IST Mon/Wed/Fri
+  workflow_dispatch: {}
+
+# Never let two runs overlap (they'd both scrape/score the same backlog).
+concurrency:
+  group: daily-pipeline
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Preflight — required secrets present
+        run: |
+          missing=0
+          for v in GOOGLE_API_KEY APIFY_API_TOKEN SUPABASE_URL SUPABASE_SERVICE_KEY; do
+            if [ -z "${!v}" ]; then echo "::error::Missing secret $v"; missing=1; fi
+          done
+          [ "$missing" = "0" ] || { echo "Add the missing secrets in repo Settings -> Secrets and variables -> Actions."; exit 1; }
+          echo "All required secrets are present."
+
+      # 1) Match the unscored backlog first (oldest first; stops itself when the
+      #    daily Gemini budget is exhausted, leaving the rest for the next run).
+      - name: Match backlog (Gemini rubric + quality gate)
+        run: npx ts-node agents/matcher/index.ts
+        continue-on-error: true # a matcher hiccup must not block the scrape top-up
+
+      # 2) Top-up scrape (free: curated list + Apify Google discovery) to refill
+      #    the backlog toward the target for the next run.
+      - name: Scrape new jobs (curated list + Apify discovery)
+        run: npx ts-node agents/scraper/daily-scrape.ts

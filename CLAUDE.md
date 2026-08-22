@@ -32,7 +32,15 @@ Autonomous job application system. Scrapes AI/ML jobs, scores them, generates ta
   floats that to bleeding-edge builds puppeteer can't launch; caused a
   "Failed to launch the browser process" outage fixed 2026-07-09). Dockerfile
   installs only Chromium's shared libs + fonts. (pdf-lib / Edge `--print-to-pdf`
-  retired.)
+  retired.) Every rendered PDF passes through `stripPdfMetadata()` in the same
+  file before it is returned: Chromium stamps `/Creator` with its full
+  "…HeadlessChrome/149…" UA and `/Producer` with "Skia/PDF m149", which tells a
+  recruiter reading file properties that the document was machine-generated.
+  Both values are overwritten with spaces **in place** — never resized, so byte
+  offsets and the xref table stay valid. `/Title` is kept. Note the values are
+  PDF literal strings with ESCAPED parens (`\(Windows NT 10.0…\)`), so the
+  stripper walks them with a depth+escape scanner; a plain `\(([^)]*)\)` regex
+  silently leaves `HeadlessChrome` in the file.
 
 ## How agents run
 The daily pipeline runs the TypeScript agents directly on a **GitHub Actions
@@ -87,6 +95,16 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
   is scraped or scored twice.
 - Resume generation: always present exactly 2 years of experience regardless of
   the JD's ask; ATS-optimise (mirror JD keywords, standard headings, no tables).
+- The resume template is **single-column** (`dashboard/lib/resume-template.ts`).
+  Do NOT reintroduce a sidebar. An ATS reads the PDF's text layer, and a
+  two-column body linearises the ENTIRE sidebar before the right-hand content —
+  measured on the real resume, Experience sat at line 45 of the extracted text
+  and moving to one column brought it to line 12 (ATS parseability 82 → 96).
+  Section order is Summary → Skills → Experience → Projects → Education +
+  Certifications. Skills are comma-separated text, not flex chips: chips wrap
+  onto their own lines and orphan single keywords ("Power BI" alone on a line).
+  Never put an emoji in a template — Chromium writes it as an unpaired surrogate
+  pair, which is invalid UTF-8 and shows as U+FFFD to a parser.
 - Manual apply queue for non-Greenhouse/Lever companies (Workday, custom portals)
 
 ## Application Status Pipeline

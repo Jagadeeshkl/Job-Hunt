@@ -66,7 +66,8 @@ export function renderCoverLetterHTML(data: BaseResume, t: CoverLetterTailoring)
     <h1>${esc(data.name)}</h1>
     <div class="subtitle">${esc(t.headline)}</div>
     <div class="contact">
-      <span>📍 ${esc(c.location)}</span>
+      <!-- No emoji: see the note in resume-template.ts — it becomes invalid UTF-8. -->
+      <span>${esc(c.location)}</span>
       <span class="sep">|</span>
       <a href="mailto:${esc(c.email)}">${esc(c.email)}</a>
       <span class="sep">|</span>
